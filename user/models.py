@@ -1,4 +1,5 @@
-from django.db import models
+from django.db      import models
+#from work.models    import Work
 
 class User(models.Model):
     user_name           = models.CharField(max_length = 40)
@@ -12,3 +13,5 @@ class User(models.Model):
 
     class Meta:
         db_table = "Users"
+
+
