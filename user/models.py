@@ -6,7 +6,7 @@ class User(models.Model):
     mobile              = models.CharField(max_length = 40)
     password            = models.CharField(max_length = 200)
     introduction        = models.CharField(max_length = 300, null = True)
-    profile_image_url   = models.CharField(max_length = 1000, null = True)
+    profile_image_url   = models.URLField(max_length = 1000, null = True)
     created_at          = models.DateTimeField(auto_now_add = True)
     updated_at          = models.DateTimeField(auto_now = True)
     following           = models.ManyToManyField(
@@ -21,4 +21,5 @@ class Follow(models.Model):
     creator             = models.ForeignKey(User, on_delete = models.CASCADE, related_name = "creator")
 
     class Meta:
-        db_table = "follows"
+        unique_together = ("follower", "creator")
+        db_table        = "follows"

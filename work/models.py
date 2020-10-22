@@ -3,6 +3,7 @@ from user.models    import User
 
 class Category(models.Model):
     name            = models.CharField(max_length = 40)
+    tag             = models.ManyToManyField("Tag", through = "CategoryToTag", related_name = "categories_tags")
 
     class Meta:
         db_table = "categories"
@@ -15,13 +16,14 @@ class Work(models.Model):
     views           = models.IntegerField(default = 0)
     created_at      = models.DateTimeField(auto_now_add = True)
     updated_at      = models.DateTimeField(auto_now = True)
+    tag             = models.ManyToManyField("Tag", through = "WorkToTag", related_name = "works_tags")
 
     class Meta:
         db_table = "works"
 
 class WorkImage(models.Model):
     work            = models.ForeignKey(Work, on_delete = models.CASCADE)
-    image_url       = models.CharField(max_length = 1000)
+    image_url       = models.URLField(max_length = 1000)
 
     class Meta:
         db_table = "works_images"
@@ -35,7 +37,7 @@ class ThemeColor(models.Model):
 class WallpaperImage(models.Model):
     work            = models.ForeignKey(Work, on_delete = models.CASCADE)
     themecolor      = models.ForeignKey(ThemeColor, on_delete = models.CASCADE)
-    image_url       = models.CharField(max_length = 1000)
+    image_url       = models.URLField(max_length = 1000)
     download_count  = models.IntegerField(default = 0)
 
     class Meta:
@@ -57,8 +59,7 @@ class LikeIt(models.Model):
 
 class Tag(models.Model):
     name            = models.CharField(max_length = 40)
-    category        = models.ManyToManyField(Category, through = "CategoryToTag", related_name = "categories")
-    work            = models.ManyToManyField(Work, through = "WorkToTag", related_name = "works")
+    
 
     class Meta:
         db_table = "tags"
@@ -68,14 +69,16 @@ class CategoryToTag(models.Model):
     tag             = models.ForeignKey(Tag, on_delete = models.CASCADE, related_name = "category_tag")
 
     class Meta:
-        db_table = "categories_tags"
+        unique_together = ("category", "tag")
+        db_table        = "categories_tags"
 
 class WorkToTag(models.Model):
     work            = models.ForeignKey(Work, on_delete = models.CASCADE, related_name = "work")
     tag             = models.ForeignKey(Tag, on_delete = models.CASCADE, related_name = "work_tag")
 
     class Meta:
-        db_table = "works_tags"
+        unique_together = ("work", "tag")
+        db_table        = "works_tags"
 
 class Comment(models.Model):
     user                = models.ForeignKey("user.User", on_delete = models.CASCADE)
