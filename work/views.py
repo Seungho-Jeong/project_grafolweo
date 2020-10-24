@@ -45,8 +45,6 @@ class WorksListView(View) :
         else :
             return JsonResponse({'MESSAGE': workslist }, status=200)
 
-# class WorksMainCategoryView(View) :
-
 class CategoryTagView(View) : 
 
     def get(self, request, category) :
@@ -63,7 +61,7 @@ class CategoryTagView(View) :
 
 class PopularCreatorView(View) :
 
-    def get(self, request) :
+    def get(self, request, category) :
         users = User.objects.all()
         creatorlist = [{
                 "id"            : user.id,
@@ -73,7 +71,8 @@ class PopularCreatorView(View) :
                 "follower"      : user.user_to_follow.count(),
                 "like"          : sum([ works.likeit_set.count() for works in user.work_set.all() ]),
                 "illust"        : user.work_set.count(),
-                "imgPreviewSrc" : [works.workimage_set.all()[0].image_url for works in user.work_set.all()][:3]
-            } for user in users ][:16]
-        creatorlist = sorted(creatorlist, reverse=True, key=lambda x: x["like"])
+                "imgPreviewSrc" : [works.workimage_set.all()[0].image_url for works in user.work_set.all()][:3],
+                "category_like" : sum([ works.likeit_set.count() for works in user.work_set.all() if works.category.name == category ])
+            } for user in users ]
+        creatorlist = sorted(creatorlist, reverse=True, key=lambda x: x["category_like"])[:16]
         return JsonResponse({'popularCreator': creatorlist }, status=200)

@@ -8,5 +8,5 @@ from work.views  import (
 urlpatterns = [
     path('/list/<str:sort>/<int:page>', WorksListView.as_view()),
     path('/category/<str:category>', CategoryTagView.as_view()),
-    path('/category/list/popular_creator', PopularCreatorView.as_view()),
+    path('/category/popular_creator/<str:category>', PopularCreatorView.as_view()),
 ]
