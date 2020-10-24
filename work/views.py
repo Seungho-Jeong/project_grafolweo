@@ -41,9 +41,18 @@ class WorksListView(View) :
             } for work in work_all ]
         if sort == "발견" :
             workslist=sorted(workslist, reverse=True, key=lambda x: x["Likes"])[12*(page-1):12*page]
-            return JsonResponse({'MESSAGE': workslist }, status=200)
+            return JsonResponse({'data': workslist }, status=200)
         else :
-            return JsonResponse({'MESSAGE': workslist }, status=200)
+            return JsonResponse({'data': workslist }, status=200)
+
+class MainCategoryView(View) :
+    
+    def get(self, request) :
+        categorylist = [ {
+            "categoryName"  : category.name,
+            "categoryCount" : category.work_set.count()
+        } for category in Category.objects.all() ]
+        return JsonResponse({'data': categorylist }, status=200)
 
 class CategoryTagView(View) : 
 
