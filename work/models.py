@@ -59,7 +59,6 @@ class LikeIt(models.Model):
 
 class Tag(models.Model):
     name            = models.CharField(max_length = 40)
-    
 
     class Meta:
         db_table = "tags"
