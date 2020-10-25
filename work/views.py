@@ -65,7 +65,7 @@ class CategoryTagView(View) :
                 "name" : category_to_tag.tag.name 
             } for category_to_tag in categories_to_tags ]
             return JsonResponse({'listBannerTags': taglist }, status=200)
-        except KeyError :
+        except Category.DoesNotExist :
             return JsonResponse({'MESSAGE': "wrong category" }, status=400)
 
 class PopularCreatorView(View) :
