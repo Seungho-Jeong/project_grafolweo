@@ -1,3 +1,4 @@
+import random
 import json
 from django.http  import JsonResponse 
 from django.views import View
@@ -29,8 +30,10 @@ class TopCreatorsView(View) :
             "id"                : creator.id,
             "user_name"         : creator.user_name,
             "profile_image_url" : creator.profile_image_url,
-            "followBtn"         : creator.creator.filter(follower_id=user_id).exists()
-        } for creator in creators ][:9]
+            "followBtn"         : creator.creator.filter(follower_id=user_id).exists(),
+            "likecount"         : sum([ work.likeit_set.count() for work in creator.work_set.all() ]),
+        } for creator in creators ]
+        creatorlist = sorted(creatorlist, reverse=True, key=lambda x: x["likecount"])[:9]
         return JsonResponse({'topCreators': creatorlist }, status=200)
 
 class WallpaperMainFollowView(View) :
@@ -42,22 +45,30 @@ class WallpaperMainFollowView(View) :
             creator_id = data['creator_id']
             follow     = Follow.objects.get(follower_id = user_id, creator_id = creator_id)
             follow.delete()
-            message = {
+            data = {
                 "id"        : creator_id,
                 "followBtn" : False
             }
-            return JsonResponse({'data': message }, status=200)
+            return JsonResponse({'data': data }, status=200)
         except Follow.DoesNotExist :
             try :
                 Follow.objects.create( follower_id = user_id, creator_id = creator_id)
-                message = {
+                data = {
                     "id"        : creator_id,
                     "followBtn" : True
                 }
-                return JsonResponse({'data': message }, status=200)
+                return JsonResponse({'data': data }, status=200)
             except IntegrityError :
-                return JsonResponse({'Error': "unknown user" }, status=400)
+                return JsonResponse({'MESSAGE': "Error: unknown user" }, status=400)
         except KeyError as e :
-            return JsonResponse({'Key Error': str(e) }, status=400)
+            return JsonResponse({'MESSAGE': f"KeyError: {e}" }, status=400)
         except json.decoder.JSONDecodeError :
-            return JsonResponse({'Error': "json data error" }, status=400)
+            return JsonResponse({'MESSAGE': "Error: json data error" }, status=400)
+
+
+# class EditorPickWallpaperView(View) :
+    
+#     def get(self, request) :
+#         taglistall = [ tag.name for tag in Tag.objects.all() if not tag.category_tag.exists() ]
+#         taglist    = random.sample(taglistall, 5)
+#         print(taglist)
