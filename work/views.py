@@ -25,7 +25,7 @@ class WorksListView(View) :
         elif sort == "주목받는" :
             work_all = Work.objects.all().order_by('-views')
             work_all = work_all[12*(page-1):12*page]
-        elif sort == "발견" :
+        elif sort == "발견" or sort == "데뷰" :
             work_all = Work.objects.all()
         else :
             return JsonResponse({'MESSAGE':'Invalid sorted name'}, status=400)
@@ -37,10 +37,14 @@ class WorksListView(View) :
                 "Img"           : work.workimage_set.first().image_url,
                 "Likes"         : work.likeit_set.count(),
                 "Comments"      : work.comment_set.count(),
-                "Views"         : work.views
+                "Views"         : work.views,
+                "singup_time"   : work.user.created_at
             } for work in work_all ]
         if sort == "발견" :
             workslist=sorted(workslist, reverse=True, key=lambda x: x["Likes"])[12*(page-1):12*page]
+            return JsonResponse({'data': workslist }, status=200)
+        elif sort == "데뷰" :
+            workslist=sorted(workslist, reverse=True, key=lambda x: x["singup_time"])[12*(page-1):12*page]
             return JsonResponse({'data': workslist }, status=200)
         else :
             return JsonResponse({'data': workslist }, status=200)
