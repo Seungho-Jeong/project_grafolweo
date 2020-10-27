@@ -63,7 +63,7 @@ class CategoryListView(View) :
             "categoryCount"   : category.work_set.count(),
             "backgroundColor" : category.backgroundcolor,
             "image_url"       : category.image_url
-        } for category in Category.objects.all() ]
+        } for category in Category.objects.all().prefetch_related("work_set") ]
         return JsonResponse({'data': categorylist }, status=200)
 
 class CategoryTagView(View) : 
