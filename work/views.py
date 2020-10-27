@@ -70,7 +70,7 @@ class EditorPickWallpaperView(View) :
     def get(self, request) :
         tag_id          = request.GET.get('tag')
         if tag_id :
-            wallpaper_post = Work.objects.filter(tags__id=tag_id).select_related('user').prefetch_related("wallpaperimage_set")
+            wallpaper_post = Work.objects.filter(tag__id=tag_id).select_related('user').prefetch_related("wallpaperimage_set")
         else :
             taglistall      = [ {
                 "id"   : tag.id ,
@@ -78,7 +78,7 @@ class EditorPickWallpaperView(View) :
             } for tag in Tag.objects.all() if not tag.category_tag.exists() ]
             taglist         = random.sample(taglistall, 5)
             first_tag       = taglist[0]["id"]
-            wallpaper_post = Work.objects.filter(tags__id=first_tag).select_related('user').prefetch_related("wallpaperimage_set")
+            wallpaper_post = Work.objects.filter(tag__id=first_tag).select_related('user').prefetch_related("wallpaperimage_set")
 
         slides    = [ {
             "wallpaper_id"  : work.id ,
@@ -121,19 +121,13 @@ class WallpaperCardListView(View) :
         sort_name = request.GET.get('sort')
         order     = request.GET.get('order')
         id        = request.GET.get('id')
-        if sort_name == '태그별'  :
-            if id == '0' :
-                works        = Work.objects.all().select_related('user').prefetch_related("wallpaperimage_set")
-                cardviewlist = cardlist(works)
-                return JsonResponse({'discoverTagData': {"cardViewList" : cardviewlist} }, status=200)
-            elif id :
-                works        = Work.objects.filter( tags__id = id ).select_related('user').prefetch_related("wallpaperimage_set")
-                if works :
-                    cardviewlist = cardlist(works)
-                    return JsonResponse({'discoverTagData': {"cardViewList" : cardviewlist} }, status=200)
-                else :
-                    return JsonResponse({'Error': "Invalid tag id" }, status=400)
-            else :
+        filter = {
+            '태그별' : [Work.objects.filter(tag__id = id).select_related('user').prefetch_related("wallpaperimage_set"),"discoverTagData"],
+            '색상별' : [Work.objects.filter(wallpaperimage__themecolor_id = id).select_related('user').prefetch_related("wallpaperimage_set"),"discoverColorData"],
+            '유형별' : [Work.objects.filter(category__id = id).select_related('user').prefetch_related("wallpaperimage_set"),"discoverTypeData"]
+        }
+        try :
+            if not id and sort_name == "태그별" :
                 tag_list = [ { 
                     "id"   : tag.id,
                     "name" : tag.name
@@ -146,27 +140,19 @@ class WallpaperCardListView(View) :
                     "cardViewList" : cardviewlist
                 } }, status=200)
 
-        elif sort_name == '색상별'  :
-            if id :
-                works = Work.objects.filter(wallpaperimage__themecolor_id = id).select_related('user').prefetch_related("wallpaperimage_set")
-                if works :
-                    cardviewlist = cardlist(works)
-                    return JsonResponse({'discoverTagData': {"cardViewList" : cardviewlist} }, status=200)
-                else :
-                    return JsonResponse({'Error': "Invalid color_id" }, status=400)
+            elif id == '0' and sort_name == "태그별" :
+                works        = Work.objects.all().select_related('user').prefetch_related("wallpaperimage_set")
+            elif id :
+                works = filter[sort_name][0]
             else :
-                return JsonResponse({'Error': "Need color_id" }, status=400)
-
-        elif sort_name == '유형별'  :
-            if id :
-                works = Work.objects.filter(category__id = id).select_related('user').select_related('user').prefetch_related("wallpaperimage_set")
-                if works :
-                    cardviewlist = cardlist(works)
-                    return JsonResponse({'discoverTagData': {"cardViewList" : cardviewlist} }, status=200)
-                else :
-                    return JsonResponse({'Error': "Invalid category_id" }, status=400)
+                return JsonResponse({'Error': "Need id" }, status=400)
+            if works :
+                cardviewlist = cardlist(works)
+                return JsonResponse({filter[sort_name][1]: {"cardViewList" : cardviewlist} }, status=200)
             else :
-                return JsonResponse({'Error': "Need category_id" }, status=400)
+                return JsonResponse({'Error': "Invalid id" }, status=400)
+        except KeyError :
+            return JsonResponse({'Error': "Invalid sort_name" }, status=400)
 
 class WallpaperdownloadcountView(View) :
     
