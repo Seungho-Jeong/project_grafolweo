@@ -70,10 +70,11 @@ class CategoryTagView(View) :
 
     def get(self, request, category_id) :
         try :
-            categories_to_tags = CategoryToTag.objects.filter( category_id = category_id).select_related("tag")
+            categories_to_tags = CategoryToTag.objects.filter( category_id = category_id).select_related("tag", "category")
             taglist = [ {
-                "id" : category_to_tag.tag.id ,
-                "name" : category_to_tag.tag.name 
+                "id"        : category_to_tag.tag.id ,
+                "name"      : category_to_tag.tag.name ,
+                "image_url" : category_to_tag.category.image_url
             } for category_to_tag in categories_to_tags ]
             return JsonResponse({'listBannerTags': taglist }, status=200)
         except Category.DoesNotExist :
