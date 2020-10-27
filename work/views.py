@@ -13,7 +13,7 @@ class WorkDetailView(View):
             this_work     = Work.objects.get(id = work_id)
             creator       = this_work.user
             related_works = creator.work_set.exclude(id = work_id)
-            comments      = Comment.objects.filter(work_id = work_id)
+            comments      = this_work.comment_set.all()
             detail        = {
                 "id"          : this_work.id,
                 "title"       : this_work.title,
@@ -25,18 +25,19 @@ class WorkDetailView(View):
                 "updated_at"  : this_work.updated_at,
                 "image_url"   : [ workimage.image_url for workimage in this_work.workimage_set.all() ],
                 "tag"         : [ tag.name for tag in this_work.tag.all() ],
-                "commentNum"  : len(comments),
+                "commentNum"  : comments.count(),
                 "comment"     : [ {
+                    "id"               : comment.id,
                     "user_name"        : comment.user.user_name,
                     "profile_image_url": comment.user.profile_image_url,
-                    "comment_content"  : comment.comment_content
+                    "comment_content"  : comment.comment_content,
+                    "created_at"       : comment.created_at
                     } for comment in comments ],
                 "others"      : [ {
                     "related_title"    : related_work.title,
                     "related_image_url": related_work.workimage_set.first().image_url
                     } for related_work in related_works ]
             }
-
             return JsonResponse({"artworkDetails": detail}, status=200)
 
         except Work.DoesNotExist:
@@ -67,7 +68,6 @@ class CommentView(View):
                     "comment_content" : comment.comment_content,
                     "created_at"      : comment.created_at
                 } for comment in comments ]
-
                 return JsonResponse({"POSTING_SUCCESS": comment_list}, status=201)
 
             return JsonResponse({"MESSAGE": "DOES_NOT_EXIST_PAGE"}, status=400)
@@ -91,7 +91,6 @@ class CommentView(View):
                 "comment_content" : comment.comment_content,
                 "created_at"      : comment.created_at
             } for comment in comments ]
-
             return JsonResponse({"DELETE_SUCCESS": comment_list}, status=200)
 
         except Comment.DoesNotExist:
@@ -117,7 +116,6 @@ class CommentView(View):
                     "comment_content" : comment.comment_content,
                     "created_at"      : comment.created_at
                 } for comment in comments ]
-
                 return JsonResponse({"MODIFY_SUCCESS": comment_list}, status=200)
 
         except Comment.DoesNotExist:
