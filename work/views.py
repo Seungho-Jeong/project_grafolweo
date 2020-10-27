@@ -7,7 +7,6 @@ from user.models  import User, Follow
 from work.models  import (
     Category,
     Work,
-    WorkImage,
     ThemeColor,
     WallpaperImage,
     LikeItKind,
@@ -25,7 +24,7 @@ class TopCreatorsView(View) :
     
     def get(self, request) : 
         user_id     = 10    # 임시 데이터, 추후 토큰 데코레이터를 통해 user_id 받을 예정
-        creators    = User.objects.all()
+        creators    = User.objects.all().select_related('user')
         creatorlist = [ {
             "id"                : creator.id,
             "user_name"         : creator.user_name,
@@ -49,7 +48,7 @@ class WallpaperMainFollowView(View) :
                 "id"        : creator_id,
                 "followBtn" : False
             }
-            return JsonResponse({'data': data }, status=200)
+            return JsonResponse({'data': data }, status=201)
         except Follow.DoesNotExist :
             try :
                 Follow.objects.create( follower_id = user_id, creator_id = creator_id)
@@ -57,7 +56,7 @@ class WallpaperMainFollowView(View) :
                     "id"        : creator_id,
                     "followBtn" : True
                 }
-                return JsonResponse({'data': data }, status=200)
+                return JsonResponse({'data': data }, status=201)
             except IntegrityError :
                 return JsonResponse({'MESSAGE': "Error: unknown user" }, status=400)
         except KeyError as e :
@@ -66,9 +65,118 @@ class WallpaperMainFollowView(View) :
             return JsonResponse({'MESSAGE': "Error: json data error" }, status=400)
 
 
-# class EditorPickWallpaperView(View) :
+class EditorPickWallpaperView(View) :
     
-#     def get(self, request) :
-#         taglistall = [ tag.name for tag in Tag.objects.all() if not tag.category_tag.exists() ]
-#         taglist    = random.sample(taglistall, 5)
-#         print(taglist)
+    def get(self, request) :
+        tag_id          = request.GET.get('tag')
+        if tag_id :
+            wallpaper_post = Work.objects.filter(tags__id=tag_id).select_related('user').prefetch_related("wallpaperimage_set")
+        else :
+            taglistall      = [ {
+                "id"   : tag.id ,
+                "name" : tag.name
+            } for tag in Tag.objects.all() if not tag.category_tag.exists() ]
+            taglist         = random.sample(taglistall, 5)
+            first_tag       = taglist[0]["id"]
+            wallpaper_post = Work.objects.filter(tags__id=first_tag).select_related('user').prefetch_related("wallpaperimage_set")
+
+        slides    = [ {
+            "wallpaper_id"  : work.id ,
+            "subject"       : work.title ,
+            "wallpaperSrc"  : work.wallpaperimage_set.first().image_url ,
+            "name"          : work.user.user_name ,
+            "profileImgSrc" : work.user.profile_image_url,
+            "downloadNum"   : work.wallpaperimage_set.first().download_count
+        } for work in wallpaper_post if work.wallpaperimage_set.exists() ][:8]
+        if tag_id :
+            return JsonResponse({'editorsPickData': { "Slides"  : slides
+            } }, status=200)
+        else :
+            return JsonResponse({'editorsPickData': {
+                "TagList" : taglist,
+                "Slides"  : slides
+            } }, status=200)
+
+class WallpaperCardListView(View) :
+    
+    def get(self, request) :
+        
+        def cardlist(works) :
+            if order =='최신순':
+                works = works.order_by('-created_at')
+            cardlist = [ {
+                    "wallpaper_id"  : work.wallpaperimage_set.first().id ,
+                    "subject"       : work.title ,
+                    "wallpaperSrc"  : work.wallpaperimage_set.first().image_url ,
+                    "name"          : work.user.user_name ,
+                    "profileImgSrc" : work.user.profile_image_url,
+                    "downloadNum"   : work.wallpaperimage_set.first().download_count,
+                    "views"         : work.views,
+                    "created_at"    : work.created_at
+                } for work in works if work.wallpaperimage_set.exists() ]
+            if order =='인기순' :
+                cardlist = sorted(cardlist, reverse=True, key=lambda x: x["downloadNum"])
+            return cardlist
+
+        sort_name = request.GET.get('sort')
+        order     = request.GET.get('order')
+        id        = request.GET.get('id')
+        if sort_name == '태그별'  :
+            if id == '0' :
+                works        = Work.objects.all().select_related('user').prefetch_related("wallpaperimage_set")
+                cardviewlist = cardlist(works)
+                return JsonResponse({'discoverTagData': {"cardViewList" : cardviewlist} }, status=200)
+            elif id :
+                works        = Work.objects.filter( tags__id = id ).select_related('user').prefetch_related("wallpaperimage_set")
+                if works :
+                    cardviewlist = cardlist(works)
+                    return JsonResponse({'discoverTagData': {"cardViewList" : cardviewlist} }, status=200)
+                else :
+                    return JsonResponse({'Error': "Invalid tag id" }, status=400)
+            else :
+                tag_list = [ { 
+                    "id"   : tag.id,
+                    "name" : tag.name
+                } for tag in Tag.objects.all() if not tag.category_tag.exists() ][:10]
+                taglist = [ { "id" : 0, "name" : "전체" } ] + tag_list
+                works   = Work.objects.all().select_related('user').prefetch_related("wallpaperimage_set")
+                cardviewlist = cardlist(works)
+                return JsonResponse({'discoverTagData': {
+                    "tagList"      : taglist,
+                    "cardViewList" : cardviewlist
+                } }, status=200)
+
+        elif sort_name == '색상별'  :
+            if id :
+                works = Work.objects.filter(wallpaperimage__themecolor_id = id).select_related('user').prefetch_related("wallpaperimage_set")
+                if works :
+                    cardviewlist = cardlist(works)
+                    return JsonResponse({'discoverTagData': {"cardViewList" : cardviewlist} }, status=200)
+                else :
+                    return JsonResponse({'Error': "Invalid color_id" }, status=400)
+            else :
+                return JsonResponse({'Error': "Need color_id" }, status=400)
+
+        elif sort_name == '유형별'  :
+            if id :
+                works = Work.objects.filter(category__id = id).select_related('user').select_related('user').prefetch_related("wallpaperimage_set")
+                if works :
+                    cardviewlist = cardlist(works)
+                    return JsonResponse({'discoverTagData': {"cardViewList" : cardviewlist} }, status=200)
+                else :
+                    return JsonResponse({'Error': "Invalid category_id" }, status=400)
+            else :
+                return JsonResponse({'Error': "Need category_id" }, status=400)
+
+class WallpaperdownloadcountView(View) :
+    
+    def post(self, request) :
+        data              = json.loads(request.body) 
+        WallpaperImage_id = data['wallpaper_id']
+        try :
+            wallpaper    = WallpaperImage.objects.get(id= WallpaperImage_id)
+            wallpaper.download_count += 1
+            wallpaper.save()
+            return JsonResponse({'Message': "Download Count Success" }, status=200)
+        except WallpaperImage.DoesNotExist :
+            return JsonResponse({'Error': "Invalid wallpaper_id" }, status=400)
