@@ -31,18 +31,17 @@ class SignUpView(View):
             if not re.match("^[a-zA-Z0-9]([-_\.]?[a-zA-Z0-9])*@[a-zA-Z0-9]([-_\.]?[a-zA-Z0-9])*\.[a-zA-Z]{2,}$", data["email"]):
                 return JsonResponse({"MESSAGE": "NOT_IN_EMAIL_FORM"}, status=400)
 
-            else:
-                hashed_password = bcrypt.hashpw(
-                    data["password"].encode("UTF-8"), bcrypt.gensalt())
-                User.objects.create(
-                    user_name         = data["user_name"],
-                    email             = data["email"],
-                    mobile            = data["mobile"],
-                    password          = hashed_password.decode("UTF-8"),
-                    introduction      = data["introduction"],
-                    profile_image_url = data["profile_image_url"]
-                )
-                return JsonResponse({"MESSAGE": "REGISTRATION_SUCCESS"}, status=201)
+            hashed_password = bcrypt.hashpw(
+                data["password"].encode("UTF-8"), bcrypt.gensalt())
+            User.objects.create(
+                user_name         = data["user_name"],
+                email             = data["email"],
+                mobile            = data["mobile"],
+                password          = hashed_password.decode("UTF-8"),
+                introduction      = data["introduction"],
+                profile_image_url = data["profile_image_url"]
+            )
+            return JsonResponse({"MESSAGE": "REGISTRATION_SUCCESS"}, status=201)
 
         except KeyError as e:
             return JsonResponse({"MESSAGE": f"KEY_ERROR:{e}"}, status=400)
@@ -66,10 +65,10 @@ class LoginView(View):
                 return JsonResponse({"MESSAGE": "LOGIN_SUCCESS", "token": token.decode("UTF-8")}, status=200)
 
             else:
-                return JsonResponse({"MESSAGE": "WRONG_PASSWORD"}, status=401)
+                return JsonResponse({"MESSAGE": "INVALID_INPUT"}, status=401)
 
         except User.DoesNotExist:
-                return JsonResponse({"MESSAGE": "DOES_NOT_EXIST_USER"}, status=401)
+                return JsonResponse({"MESSAGE": "INVALID_INPUT"}, status=401)
 
         except KeyError as e:
             return JsonResponse({"MESSAGE": f"KEY_ERROR:{e}"}, status=401)
