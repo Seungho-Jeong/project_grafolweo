@@ -1,14 +1,14 @@
 from django.urls import path
 from work.views  import (
     WorksListView,
-    MainCategoryView,
+    CategoryListView,
     CategoryTagView,
     PopularCreatorView
 )
 
 urlpatterns = [
-    path('/main/list/<str:sort>/<int:page>', WorksListView.as_view()),
-    path('/main/category', MainCategoryView.as_view()),
-    path('/category/<str:category>', CategoryTagView.as_view()),
-    path('/category/popular_creator/<str:category>', PopularCreatorView.as_view()),
+    path('/list', WorksListView.as_view()),
+    path('/category', CategoryListView.as_view()),
+    path('/tag/<int:category_id>', CategoryTagView.as_view()),
+    path('/popular_creator', PopularCreatorView.as_view()),
 ]

@@ -18,17 +18,22 @@ from work.models  import (
 
 class WorksListView(View) :
 
-    def get(self, request, sort, page) :
-        if sort == "최신" :
-            work_all = Work.objects.all().order_by('-created_at')
-            work_all = work_all[12*(page-1):12*page]
-        elif sort == "주목받는" :
-            work_all = Work.objects.all().order_by('-views')
-            work_all = work_all[12*(page-1):12*page]
+    def get(self, request) :
+        sort       = request.GET.get('sort')
+        limit      = int(request.GET.get('limit'))
+        offset     = int(request.GET.get('offset'))
+        sort_order = { 
+            '최신'     : '-created_at',
+            '주목받는' : '-views'
+        }
+
+        if sort in sort_order :
+            works = Work.objects.all().order_by(sort_order[sort]).select_related("user").prefetch_related("workimage_set", "likeit_set", "comment_set")[offset:(offset+limit)]
         elif sort == "발견" or sort == "데뷰" :
-            work_all = Work.objects.all()
+            works = Work.objects.all().select_related("user").prefetch_related("workimage_set", "likeit_set", "comment_set")
         else :
             return JsonResponse({'MESSAGE':'Invalid sorted name'}, status=400)
+
         workslist = [ {
                 "id"            : work.id ,
                 "AuthorName"    : work.user.user_name ,
@@ -39,31 +44,33 @@ class WorksListView(View) :
                 "Comments"      : work.comment_set.count(),
                 "Views"         : work.views,
                 "singup_time"   : work.user.created_at
-            } for work in work_all ]
+            } for work in works ]
         if sort == "발견" :
-            workslist=sorted(workslist, reverse=True, key=lambda x: x["Likes"])[12*(page-1):12*page]
+            workslist=sorted(workslist, reverse=True, key=lambda x: x["Likes"])[offset:(offset+limit)]
             return JsonResponse({'data': workslist }, status=200)
         elif sort == "데뷰" :
-            workslist=sorted(workslist, reverse=True, key=lambda x: x["singup_time"])[12*(page-1):12*page]
+            workslist=sorted(workslist, reverse=True, key=lambda x: x["singup_time"])[offset:(offset+limit)]
             return JsonResponse({'data': workslist }, status=200)
         else :
             return JsonResponse({'data': workslist }, status=200)
 
-class MainCategoryView(View) :
+class CategoryListView(View) :
     
     def get(self, request) :
         categorylist = [ {
-            "categoryName"  : category.name,
-            "categoryCount" : category.work_set.count()
+            "categoryid"      : category.id,
+            "categoryName"    : category.name,
+            "categoryCount"   : category.work_set.count(),
+            "backgroundColor" : category.backgroundcolor,
+            "image_url"       : category.image_url
         } for category in Category.objects.all() ]
         return JsonResponse({'data': categorylist }, status=200)
 
 class CategoryTagView(View) : 
 
-    def get(self, request, category) :
+    def get(self, request, category_id) :
         try :
-            category_id = Category.objects.get( name = category ).id
-            categories_to_tags = CategoryToTag.objects.filter( category_id = category_id)
+            categories_to_tags = CategoryToTag.objects.filter( category_id = category_id).select_related("tag")
             taglist = [ {
                 "id" : category_to_tag.tag.id ,
                 "name" : category_to_tag.tag.name 
@@ -74,8 +81,9 @@ class CategoryTagView(View) :
 
 class PopularCreatorView(View) :
 
-    def get(self, request, category) :
-        users = User.objects.all()
+    def get(self, request) :
+        category    = request.GET.get('category')
+        users       = User.objects.all().prefetch_related("work_set", "user_to_follow")
         creatorlist = [{
                 "id"            : user.id,
                 "profileImgSrc" : user.profile_image_url,
