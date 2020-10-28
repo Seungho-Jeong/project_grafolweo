@@ -72,7 +72,8 @@ class WallpaperMainFollowView(View) :
 class EditorPickWallpaperView(View) :
     
     def get(self, request) :
-        tag_id          = request.GET.get('tag')
+        CONST_LENGTH = 8
+        tag_id       = request.GET.get('tag')
         if tag_id :
             wallpaper_post = Work.objects.filter(tag__id=tag_id).select_related('user').prefetch_related("wallpaperimage_set")
         else :
@@ -91,7 +92,7 @@ class EditorPickWallpaperView(View) :
             "name"          : work.user.user_name ,
             "profileImgSrc" : work.user.profile_image_url,
             "downloadNum"   : work.wallpaperimage_set.first().download_count
-        } for work in wallpaper_post if work.wallpaperimage_set.exists() ][:8]
+        } for work in wallpaper_post if work.wallpaperimage_set.exists() ][:CONST_LENGTH]
         if tag_id :
             return JsonResponse({'editorsPickData': { "Slides"  : slides
             } }, status=200)
@@ -122,6 +123,8 @@ class WallpaperCardListView(View) :
                 cardlist = sorted(cardlist, reverse=True, key=lambda x: x["downloadNum"])
             return cardlist
 
+        limit     = int(request.GET.get('limit','9'))
+        offset    = int(request.GET.get('offset','0'))
         sort_name = request.GET.get('sort')
         order     = request.GET.get('order')
         id        = request.GET.get('id')
@@ -138,7 +141,7 @@ class WallpaperCardListView(View) :
                 } for tag in Tag.objects.all() if not tag.category_tag.exists() ][:10]
                 taglist = [ { "id" : 0, "name" : "전체" } ] + tag_list
                 works   = Work.objects.all().select_related('user').prefetch_related("wallpaperimage_set")
-                cardviewlist = cardlist(works)
+                cardviewlist = cardlist(works)[offset:(offset+limit)]
                 return JsonResponse({'discoverTagData': {
                     "tagList"      : taglist,
                     "cardViewList" : cardviewlist
@@ -151,7 +154,7 @@ class WallpaperCardListView(View) :
             else :
                 return JsonResponse({'Error': "Need id" }, status=400)
             if works :
-                cardviewlist = cardlist(works)
+                cardviewlist = cardlist(works)[offset:(offset+limit)]
                 return JsonResponse({filter[sort_name][1]: {"cardViewList" : cardviewlist} }, status=200)
             else :
                 return JsonResponse({'Error': "Invalid id" }, status=400)
