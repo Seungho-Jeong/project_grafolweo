@@ -5,7 +5,7 @@ class Category(models.Model):
     name             = models.CharField(max_length = 40)
     backgroundcolor  = models.CharField(max_length = 40)
     image_url        = models.URLField(max_length = 1000)
-    tag             = models.ManyToManyField("Tag", through = "CategoryToTag", related_name = "categories_tags")
+    tag              = models.ManyToManyField("Tag", through = "CategoryToTag", related_name = "categories_tags")
 
     class Meta:
         db_table = "categories"
@@ -18,7 +18,7 @@ class Work(models.Model):
     views      = models.IntegerField(default = 0)
     created_at = models.DateTimeField(auto_now_add = True)
     updated_at = models.DateTimeField(auto_now = True)
-    tag       = models.ManyToManyField("Tag", through = "WorkToTag", related_name = "works_tags")
+    tag        = models.ManyToManyField("Tag", through = "WorkToTag", related_name = "works_tags")
 
     class Meta:
         db_table = "works"

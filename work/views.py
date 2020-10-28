@@ -3,6 +3,7 @@ import json
 from django.http  import JsonResponse 
 from django.views import View
 from django.db    import IntegrityError
+from user.utils   import login_decorator
 from user.models  import User, Follow
 from work.models  import (
     Category,
@@ -22,48 +23,61 @@ from work.models  import (
 
 class TopCreatorsView(View) :
     
-    def get(self, request) : 
-        user_id     = 10    # 임시 데이터, 추후 토큰 데코레이터를 통해 user_id 받을 예정
-        creators    = User.objects.all().select_related('user')
-        creatorlist = [ {
-            "id"                : creator.id,
-            "user_name"         : creator.user_name,
-            "profile_image_url" : creator.profile_image_url,
-            "followBtn"         : creator.creator.filter(follower_id=user_id).exists(),
-            "likecount"         : sum([ work.likeit_set.count() for work in creator.work_set.all() ]),
-        } for creator in creators ]
+    @login_decorator
+    def get(self, request) :
+        creators    = User.objects.all().prefetch_related('work_set')
+        if request.user :
+            user_id     = request.user.id
+            creatorlist = [ {
+                "id"                : creator.id,
+                "user_name"         : creator.user_name,
+                "profile_image_url" : creator.profile_image_url,
+                "followBtn"         : creator.creator.filter(follower_id=user_id).exists(),
+                "likecount"         : sum([ work.likeit_set.count() for work in creator.work_set.all() ]),
+            } for creator in creators ]
+        else :
+            creatorlist = [ {
+                "id"                : creator.id,
+                "user_name"         : creator.user_name,
+                "profile_image_url" : creator.profile_image_url,
+                "followBtn"         : False,
+                "likecount"         : sum([ work.likeit_set.count() for work in creator.work_set.all() ]),
+            } for creator in creators ]
         creatorlist = sorted(creatorlist, reverse=True, key=lambda x: x["likecount"])[:9]
         return JsonResponse({'topCreators': creatorlist }, status=200)
 
 class WallpaperMainFollowView(View) :
     
-    def post(self, request) : 
-        try :
-            data       = json.loads(request.body) 
-            user_id    = 10    # 임시 데이터, 추후 토큰 데코레이터를 통해 user_id 받을 예정
-            creator_id = data['creator_id']
-            follow     = Follow.objects.get(follower_id = user_id, creator_id = creator_id)
-            follow.delete()
-            data = {
-                "id"        : creator_id,
-                "followBtn" : False
-            }
-            return JsonResponse({'data': data }, status=201)
-        except Follow.DoesNotExist :
+    @login_decorator
+    def post(self, request) :
+        if request.user :
             try :
-                Follow.objects.create( follower_id = user_id, creator_id = creator_id)
+                data       = json.loads(request.body) 
+                user_id    = request.user.id
+                creator_id = data['creator_id']
+                follow     = Follow.objects.get(follower_id = user_id, creator_id = creator_id)
+                follow.delete()
                 data = {
                     "id"        : creator_id,
-                    "followBtn" : True
+                    "followBtn" : False
                 }
                 return JsonResponse({'data': data }, status=201)
-            except IntegrityError :
-                return JsonResponse({'MESSAGE': "Error: unknown user" }, status=400)
-        except KeyError as e :
-            return JsonResponse({'MESSAGE': f"KeyError: {e}" }, status=400)
-        except json.decoder.JSONDecodeError :
-            return JsonResponse({'MESSAGE': "Error: json data error" }, status=400)
-
+            except Follow.DoesNotExist :
+                try :
+                    Follow.objects.create( follower_id = user_id, creator_id = creator_id)
+                    data = {
+                        "id"        : creator_id,
+                        "followBtn" : True
+                    }
+                    return JsonResponse({'data': data }, status=201)
+                except IntegrityError :
+                    return JsonResponse({'MESSAGE': "Error: unknown user" }, status=400)
+            except KeyError as e :
+                return JsonResponse({'MESSAGE': f"KeyError: {e}" }, status=400)
+            except json.decoder.JSONDecodeError :
+                return JsonResponse({'MESSAGE': "Error: json data error" }, status=400)
+        else :
+            return JsonResponse({'MESSAGE': "Need login" }, status=400)
 
 class EditorPickWallpaperView(View) :
     
@@ -81,7 +95,7 @@ class EditorPickWallpaperView(View) :
             wallpaper_post = Work.objects.filter(tag__id=first_tag).select_related('user').prefetch_related("wallpaperimage_set")
 
         slides    = [ {
-            "wallpaper_id"  : work.id ,
+            "wallpaper_id"  : work.wallpaperimage_set.first().id ,
             "subject"       : work.title ,
             "wallpaperSrc"  : work.wallpaperimage_set.first().image_url ,
             "name"          : work.user.user_name ,
@@ -163,6 +177,10 @@ class WallpaperdownloadcountView(View) :
             wallpaper    = WallpaperImage.objects.get(id= WallpaperImage_id)
             wallpaper.download_count += 1
             wallpaper.save()
-            return JsonResponse({'Message': "Download Count Success" }, status=200)
+            return JsonResponse({
+                'MESSAGE'     : "Download Count Success",
+                "image_url"   : wallpaper.image_url,
+                "downloadNum" : wallpaper.download_count
+            }, status=200)
         except WallpaperImage.DoesNotExist :
             return JsonResponse({'Error': "Invalid wallpaper_id" }, status=400)
