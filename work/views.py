@@ -25,25 +25,16 @@ class TopCreatorsView(View) :
     
     @login_decorator
     def get(self, request) :
+        CONST_LENGTH = 9
         creators    = User.objects.all().prefetch_related('work_set')
-        if request.user :
-            user_id     = request.user.id
-            creatorlist = [ {
-                "id"                : creator.id,
-                "user_name"         : creator.user_name,
-                "profile_image_url" : creator.profile_image_url,
-                "followBtn"         : creator.creator.filter(follower_id=user_id).exists(),
-                "likecount"         : sum([ work.likeit_set.count() for work in creator.work_set.all() ]),
-            } for creator in creators ]
-        else :
-            creatorlist = [ {
-                "id"                : creator.id,
-                "user_name"         : creator.user_name,
-                "profile_image_url" : creator.profile_image_url,
-                "followBtn"         : False,
-                "likecount"         : sum([ work.likeit_set.count() for work in creator.work_set.all() ]),
-            } for creator in creators ]
-        creatorlist = sorted(creatorlist, reverse=True, key=lambda x: x["likecount"])[:9]
+        creatorlist = [ {
+            "id"                : creator.id,
+            "user_name"         : creator.user_name,
+            "profile_image_url" : creator.profile_image_url,
+            "followBtn"         : creator.creator.filter(follower_id=request.user.id).exists() if request.user else False,
+            "likecount"         : sum([ work.likeit_set.count() for work in creator.work_set.all() ]),
+        } for creator in creators ]
+        creatorlist = sorted(creatorlist, reverse=True, key=lambda x: x["likecount"])[:CONST_LENGTH]
         return JsonResponse({'topCreators': creatorlist }, status=200)
 
 class WallpaperMainFollowView(View) :
@@ -76,8 +67,7 @@ class WallpaperMainFollowView(View) :
                 return JsonResponse({'MESSAGE': f"KeyError: {e}" }, status=400)
             except json.decoder.JSONDecodeError :
                 return JsonResponse({'MESSAGE': "Error: json data error" }, status=400)
-        else :
-            return JsonResponse({'MESSAGE': "Need login" }, status=400)
+        return JsonResponse({'MESSAGE': "Need login" }, status=400)
 
 class EditorPickWallpaperView(View) :
     
