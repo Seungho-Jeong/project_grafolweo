@@ -3,8 +3,8 @@ import json
 from django.http        import JsonResponse, HttpResponse
 from django.views       import View
 
-from work.models        import Category, Work, WorkImage, Comment
-from user.models        import User
+from work.models        import Category, Work, WorkImage, Comment, LikeIt, LikeItKind, CommentLike
+from user.models        import User, Follow
 
 class WorkDetailView(View):
     def get(self, request, work_id):
@@ -33,91 +33,146 @@ class WorkDetailView(View):
                     "comment_content"  : comment.comment_content,
                     "created_at"       : comment.created_at
                     } for comment in comments ],
+                "likeBtnNum"  : this_work.likeit_set.all().count(),
+                "likeNum"     : this_work.likeit_set.filter(like_it_kind_id = 1).count(),
+                "touchNum"    : this_work.likeit_set.filter(like_it_kind_id = 2).count(),
+                "wantToBuyNum": this_work.likeit_set.filter(like_it_kind_id = 3).count(),
+                "followerNum" : Follow.objects.filter(creator_id = creator.id).count(),
+                "followingNum": Follow.objects.filter(follower_id = creator.id).count(),
                 "others"      : [ {
                     "related_title"    : related_work.title,
                     "related_image_url": related_work.workimage_set.first().image_url
-                    } for related_work in related_works ]
+                    } for related_work in related_works ],
             }
             return JsonResponse({"artworkDetails": detail}, status=200)
 
         except Work.DoesNotExist:
             return JsonResponse({"MESSAGE": "DOES_NOT_EXIST_PAGE"}, status=400)
 
-
 class CommentView(View):
     def post(self, request, work_id):
         data = json.loads(request.body)
 
         try:
-            if Work.objects.filter(id = work_id).exists():
+            if not Work.objects.filter(id = work_id).exists():
+                return JsonResponse({"MESSAGE": "DOES_NOT_EXIST_PAGE"}, status=400)
 
-                user_name       = data["user_name"]
+            Comment.objects.create(
+                work_id         = work_id,
+                user_id         = data["user_id"],
                 comment_content = data["comment_content"]
-                user_id = User.objects.get(user_name = user_name).id
-
-                Comment.objects.create(
-                    work_id         = work_id,
-                    user_id         = user_id,
-                    comment_content = comment_content
-                )
-
-                comments = Comment.objects.filter(work_id = work_id)
-                comment_list = [ {
-                    "id"              : comment.id,
-                    "user_name"       : comment.user.user_name,
-                    "comment_content" : comment.comment_content,
-                    "created_at"      : comment.created_at
-                } for comment in comments ]
-                return JsonResponse({"POSTING_SUCCESS": comment_list}, status=201)
-
-            return JsonResponse({"MESSAGE": "DOES_NOT_EXIST_PAGE"}, status=400)
+            )
+            return JsonResponse({"MESSAGE": "COMMENT_SUCCESS"}, status=201)
 
         except KeyError as e:
-            return JsonResponse({"MESSAGE": f"KEY_ERROR:{e}"}, status=400)
-
-        except ValueError as e:
-            return JsonResponse({"MESSAGE": f"VALUE_ERROR:{e}"}, status=400)
-
+            return JsonResponse({"MESSAGE": f"{e}_IS_MISSING"}, status=400)
 
     def delete(self, requset, work_id, comment_id):
 
         try:
-            Comment.objects.get(id = comment_id).delete()
+            if not Work.objects.filter(id = work_id).exists():
+                return JsonResponse({"MESSAGE": "DOES_NOT_EXIST_PAGE"}, status=400)
 
-            comments = Comment.objects.filter(work_id = work_id)
-            comment_list = [ {
-                "id"              : comment.id,
-                "user_name"       : comment.user.user_name,
-                "comment_content" : comment.comment_content,
-                "created_at"      : comment.created_at
-            } for comment in comments ]
-            return JsonResponse({"DELETE_SUCCESS": comment_list}, status=200)
+            Comment.objects.get(id = comment_id).delete()
+            return JsonResponse({"MESSAGE": "DELETE_SUCCESS"}, status=200)
 
         except Comment.DoesNotExist:
             return JsonResponse({"MESSAGE": "DOES_NOT_EXIST_COMMENT"}, status=400)
-
 
     def patch(self, request, work_id, comment_id):
         data = json.loads(request.body)
 
         try:
-            user_name   = data["user_name"]
-            new_content = data["comment_content"]
-            target      = Comment.objects.get(id = comment_id)
+            if not Work.objects.filter(id = work_id).exists():
+                return JsonResponse({"MESSAGE":"DOES_NOT_EXIST_PAGE"}, status=400)
 
-            if Comment.objects.get(id = comment_id).user.user_name == user_name:
-                target.comment_content = new_content
-                target.save()
+            if Comment.objects.get(id = comment_id).user.id != data["user_id"]:
+                return JsonResponse({"MESSAGE": "UNAUTHORIZAION"}, status=401)
 
-                comments = Comment.objects.filter(work_id = work_id)
-                comment_list = [ {
-                    "id"              : comment.id,
-                    "user_name"       : comment.user.user_name,
-                    "comment_content" : comment.comment_content,
-                    "created_at"      : comment.created_at
-                } for comment in comments ]
-                return JsonResponse({"MODIFY_SUCCESS": comment_list}, status=200)
+            target                 = Comment.objects.get(id = comment_id)
+            target.comment_content = data["comment_content"]
+            target.save()
+            return JsonResponse({"MESSAGE": "MODIFY_SUCCESS"}, status=200)
 
         except Comment.DoesNotExist:
             return JsonResponse({"MESSAGE": "DOES_NOT_EXIST_COMMENT"}, status=400)
 
+class CommentLikeView(View):
+    def post(self, request, work_id, comment_id):
+        data = json.loads(request.body)
+
+        try:
+            user_id = data["user_id"]
+
+            if CommentLike.objects.filter(
+                comment_id = comment_id,
+                user_id    = user_id
+            ).exists():
+                CommentLike.objects.filter(
+                    comment_id = comment_id,
+                    user_id    = user_id
+                )[0].delete()
+                count = CommentLike.objects.filter(comment_id = comment_id).count()
+                return JsonResponse({"LIKE_COUNT": count}, status=200)
+
+            CommentLike.objects.create(
+                comment_id = comment_id,
+                user_id    = user_id
+            )
+            count = CommentLike.objects.filter(comment_id = comment_id).count()
+            return JsonResponse({"LIKE_COUNT": count}, status=201)
+
+        except User.DoesNotExist:
+            return JsonResponse({"MESSAGE": "DOES_NOT_EXIST_USER"}, status=401)
+
+        except Exception as e:
+            return JsonResponse({"MESSAGE": f"ERROR_{e}"}, status=400)
+
+class LikeView(View):
+    def post(self, request, work_id, like_it_kind_id):
+        data = json.loads(request.body)
+
+        try:
+            user_id   = data["user_id"]
+            kind_id   = like_it_kind_id
+            kind_name = LikeItKind.objects.get(id = like_it_kind_id).name
+
+            if LikeIt.objects.filter(
+                work_id         = work_id,
+                user_id         = user_id,
+                like_it_kind_id = kind_id
+            ).exists():
+                LikeIt.objects.filter(
+                    work_id         = work_id,
+                    user_id         = user_id,
+                    like_it_kind_id = kind_id
+                )[0].delete()
+
+                count = LikeIt.objects.filter(like_it_kind_id = kind_id).count()
+                return JsonResponse({f"{kind_name}_CANCELED": count}, status=200)
+
+            if LikeIt.objects.filter(
+                work_id = work_id,
+                user_id = user_id
+            ).exists():
+                target = LikeIt.objects.filter(
+                    work_id = work_id,
+                    user_id = user_id)[0]
+
+                target.like_it_kind_id = kind_id
+                target.save()
+
+                count = LikeIt.objects.filter(like_it_kind_id = kind_id).count()
+                return JsonResponse({f"CHANGED_TO_{kind_name}": count}, status=200)
+
+            LikeIt.objects.create(
+                work_id         = work_id,
+                user_id         = user_id,
+                like_it_kind_id = kind_id
+            )
+
+            count = LikeIt.objects.filter(like_it_kind_id = kind_id).count()
+            return JsonResponse({f"{kind_name}": count}, status=201)
+
+        except Exception as e:
+            return JsonResponse({"MESSAGE": f"ERROR{e}"}, status=400)
