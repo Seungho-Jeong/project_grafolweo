@@ -4,7 +4,11 @@ from work.views  import (
     FollowView,
     EditorPickWallpaperView,
     WallpaperCardListView,
-    WallpaperdownloadcountView
+    WallpaperdownloadcountView,
+    WorksListView,
+    CategoryListView,
+    CategoryTagView,
+    PopularCreatorView
 )
 
 urlpatterns = [
@@ -13,4 +17,8 @@ urlpatterns = [
     path('/wallpaper/editorpick', EditorPickWallpaperView.as_view()),
     path('/wallpaper/cardlist', WallpaperCardListView.as_view()),
     path('/wallpaper/download', WallpaperdownloadcountView.as_view()),
+    path('/list', WorksListView.as_view()),
+    path('/category', CategoryListView.as_view()),
+    path('/tag', CategoryTagView.as_view()),
+    path('/popular_creator', PopularCreatorView.as_view()),
 ]
