@@ -4,12 +4,11 @@ import jwt
 import re
 import my_settings
 
-from django.http import JsonResponse, HttpResponse
-from django.views import View
+from django.http      import JsonResponse, HttpResponse
+from django.views     import View
 from django.db.models import Q
 
-from .models import User
-
+from .models          import User
 
 class SignUpView(View):
     def post(self, request):
@@ -35,12 +34,12 @@ class SignUpView(View):
                 hashed_password = bcrypt.hashpw(
                     data["password"].encode("UTF-8"), bcrypt.gensalt())
                 User.objects.create(
-                    user_name         = data["user_name"],
-                    email             = data["email"],
-                    mobile            = data["mobile"],
-                    password          = hashed_password.decode("UTF-8"),
-                    introduction      = data["introduction"],
-                    profile_image_url = data["profile_image_url"]
+                    user_name=data["user_name"],
+                    email=data["email"],
+                    mobile=data["mobile"],
+                    password=hashed_password.decode("UTF-8"),
+                    introduction=data["introduction"],
+                    profile_image_url=data["profile_image_url"]
                 )
                 return JsonResponse({"MESSAGE": "SUCCESS"}, status=201)
 
@@ -53,12 +52,12 @@ class LoginView(View):
     def post(self, request):
 
         try:
-            data        = json.loads(request.body)
+            data = json.loads(request.body)
             given_email = data["email"]
-            given_pw    = data["password"]
+            given_pw = data["password"]
 
-            user        = User.objects.get(email=given_email)
-            user_id     = user.id
+            user = User.objects.get(email=given_email)
+            user_id = user.id
 
             if bcrypt.checkpw(given_pw.encode("UTF-8"), user.password.encode("UTF-8")):
                 token = jwt.encode(
@@ -69,10 +68,10 @@ class LoginView(View):
                 return JsonResponse({"MESSAGE": "LOGIN_SUCCESS", "Authorization": token.decode("UTF-8")}, status=200)
 
             else:
-                return JsonResponse({"MESSAGE": "WRONG_PASSWORD"}, status=401)
+                return JsonResponse({"MESSAGE": "INVALID_INPUT"}, status=401)
 
         except User.DoesNotExist:
-                return JsonResponse({"MESSAGE": "DOES_NOT_EXIST_USER"}, status=401)
+            return JsonResponse({"MESSAGE": "INVALID_INPUT"}, status=401)
 
         except KeyError as e:
             return JsonResponse({"MESSAGE": f"KEY_ERROR:{e}"}, status=401)
