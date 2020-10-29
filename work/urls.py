@@ -1,7 +1,14 @@
-from django.urls    import path
-
-from .views         import WorkShowView
+from django.urls import path
+from work.views  import (
+    WorksListView,
+    CategoryListView,
+    CategoryTagView,
+    PopularCreatorView
+)
 
 urlpatterns = [
-    path('', WorkShowView.as_view()),
+    path('/list', WorksListView.as_view()),
+    path('/category', CategoryListView.as_view()),
+    path('/tag', CategoryTagView.as_view()),
+    path('/popular_creator', PopularCreatorView.as_view()),
 ]

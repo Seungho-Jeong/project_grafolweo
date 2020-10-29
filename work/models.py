@@ -2,8 +2,10 @@ from django.db      import models
 from user.models    import User
 
 class Category(models.Model):
-    name = models.CharField(max_length = 40)
-    tag  = models.ManyToManyField("Tag", through = "CategoryToTag", related_name = "categories_tags")
+    name            = models.CharField(max_length = 40)
+    backgroundcolor = models.CharField(max_length = 40)
+    image_url       = models.URLField(max_length = 1000)
+    tag             = models.ManyToManyField("Tag", through = "CategoryToTag", related_name = "categories_tags")
 
     class Meta:
         db_table = "categories"
@@ -59,7 +61,6 @@ class LikeIt(models.Model):
 
 class Tag(models.Model):
     name            = models.CharField(max_length = 40)
-    
 
     class Meta:
         db_table = "tags"

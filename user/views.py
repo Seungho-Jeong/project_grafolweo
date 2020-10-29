@@ -4,12 +4,11 @@ import jwt
 import re
 import my_settings
 
-from django.http import JsonResponse, HttpResponse
-from django.views import View
+from django.http      import JsonResponse, HttpResponse
+from django.views     import View
 from django.db.models import Q
 
 from .models import User
-
 
 class SignUpView(View):
     def post(self, request):
