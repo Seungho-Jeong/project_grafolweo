@@ -37,7 +37,7 @@ class TopCreatorsView(View) :
         creatorlist = sorted(creatorlist, reverse=True, key=lambda x: x["likecount"])[:CONST_LENGTH]
         return JsonResponse({'topCreators': creatorlist }, status=200)
 
-class WallpaperMainFollowView(View) :
+class FollowView(View) :
     
     @login_decorator
     def post(self, request) :
@@ -68,6 +68,17 @@ class WallpaperMainFollowView(View) :
             except json.decoder.JSONDecodeError :
                 return JsonResponse({'MESSAGE': "Error: json data error" }, status=400)
         return JsonResponse({'MESSAGE': "Need login" }, status=400)
+
+    @login_decorator
+    def get(self, request) :
+        creator_id = request.GET.get('creator_id')
+        following  = Follow.objects.filter(follower_id = request.user.id, creator_id = creator_id).exists() if request.user else False
+        data = {
+            "creator_id" : creator_id,
+            "followBtn"  : following
+        }
+        return JsonResponse({'data': data }, status=200)
+
 
 class EditorPickWallpaperView(View) :
     
