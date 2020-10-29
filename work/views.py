@@ -32,8 +32,8 @@ class WorkDetailView(View):
         this_work.views += 1
         this_work.save()
 
-        comments      = Comment.objects.filter(work_id = work_id).prefetch_related("work")
-        related_works = Work.objects.filter(user_id = this_work.user.id).exclude(id = work_id)
+        comments      = Comment.objects.filter(work_id = work_id).select_related("work")
+        related_works = this_work.user.work_set.exclude(id = work_id)
         like_it_kinds = LikeItKind.objects.all()
 
         try:
@@ -45,8 +45,8 @@ class WorkDetailView(View):
                 "creator_id"  : this_work.user.id,
                 "creator_img" : this_work.user.profile_image_url,
                 "user_id"     : request.user.id if request.user else "GEUST",
-                "user_name"   : User.objects.get(id=request.user.id).user_name if request.user else "GEUST",
-                "user_image"  : User.objects.get(id=request.user.id).profile_image_url if request.user else "GEUST",
+                "user_name"   : request.user.user_name if request.user else "GEUST",
+                "user_image"  : request.user.profile_image_url if request.user else "GEUST",
                 "views"       : this_work.views,
                 "created_at"  : this_work.created_at,
                 "updated_at"  : this_work.updated_at,
@@ -54,8 +54,8 @@ class WorkDetailView(View):
                 "tag"         : [ tag.name for tag in this_work.tag.all() ],
                 "commentNum"  : comments.count(),
                 "likeBtnNum"  : LikeIt.objects.filter(work_id = work_id).count(),
-                "followerNum" : Follow.objects.filter(creator_id = this_work.user.id).count(),
-                "followingNum": Follow.objects.filter(follower_id = this_work.user.id).count(),
+                "followerNum" : this_work.user.creator.all().count(),
+                "followingNum": this_work.user.follower.all().count(),
                 "comment"     : [ {
                     "comment_id"        : comment.id,
                     "commenter_name"    : comment.user.user_name,
@@ -219,21 +219,20 @@ class LikeView(View):
 
 class WallpaperDetailView(View):
     def get(self, request, wallpaper_id):
-
         try:
-            this_wallpaper = Work.objects.get(id = wallpaper_id)
-            creator        = this_wallpaper.user
+            this_wallpaper = WallpaperImage.objects.select_related("work").get(id = wallpaper_id)
+            creator        = this_wallpaper.work.user
             detail         = {
                 "id"            : this_wallpaper.id,
-                "title"         : this_wallpaper.title,
-                "creator"       : this_wallpaper.user.user_name,
-                "creator_img"   : this_wallpaper.user.profile_image_url,
-                "views"         : this_wallpaper.views,
-                "created_at"    : this_wallpaper.created_at,
-                "image_url"     : this_wallpaper.wallpaperimage_set.get(work_id = wallpaper_id).image_url,
-                "themecolor_id" : this_wallpaper.wallpaperimage_set.get(work_id = wallpaper_id).themecolor_id,
-                "downloadNum   ": this_wallpaper.wallpaperimage_set.get(work_id = wallpaper_id).download_count,
-                "tag"           : [ tag.name for tag in this_wallpaper.tag.all() ],
+                "title"         : this_wallpaper.work.title,
+                "creator"       : this_wallpaper.work.user.user_name,
+                "creator_img"   : this_wallpaper.work.user.profile_image_url,
+                "views"         : this_wallpaper.work.views,
+                "created_at"    : this_wallpaper.work.created_at,
+                "image_url"     : this_wallpaper.image_url,
+                "themecolor_id" : this_wallpaper.themecolor_id,
+                "downloadNum"   : this_wallpaper.download_count,
+                "tag"           : [ tag.name for tag in this_wallpaper.work.tag.all() ],
             }
             return JsonResponse({"wallpaperDetails": detail}, status=200)
 
