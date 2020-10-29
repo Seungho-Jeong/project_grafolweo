@@ -42,10 +42,12 @@ class SignUpView(View):
                     introduction      = data["introduction"],
                     profile_image_url = data["profile_image_url"]
                 )
-                return JsonResponse({"MESSAGE": "REGISTRATION_SUCCESS"}, status=201)
+                return JsonResponse({"MESSAGE": "SUCCESS"}, status=201)
 
         except KeyError as e:
             return JsonResponse({"MESSAGE": f"KEY_ERROR:{e}"}, status=400)
+        except Exception as e:
+            return JsonResponse({"MESSAGE": f"{e}_ERROR!"}, status=400)
 
 class LoginView(View):
     def post(self, request):
@@ -55,15 +57,16 @@ class LoginView(View):
             given_email = data["email"]
             given_pw    = data["password"]
 
-            account     = User.objects.get(email=given_email)
+            user        = User.objects.get(email=given_email)
+            user_id     = user.id
 
-            if bcrypt.checkpw(given_pw.encode("UTF-8"), account.password.encode("UTF-8")):
+            if bcrypt.checkpw(given_pw.encode("UTF-8"), user.password.encode("UTF-8")):
                 token = jwt.encode(
-                    {"email": given_email},
+                    {"user_id": user_id},
                     my_settings.SECRET["secret"],
                     algorithm=my_settings.ALGORITHM["algorithm"]
                 )
-                return JsonResponse({"MESSAGE": "LOGIN_SUCCESS", "token": token.decode("UTF-8")}, status=200)
+                return JsonResponse({"MESSAGE": "LOGIN_SUCCESS", "Authorization": token.decode("UTF-8")}, status=200)
 
             else:
                 return JsonResponse({"MESSAGE": "WRONG_PASSWORD"}, status=401)
@@ -73,3 +76,5 @@ class LoginView(View):
 
         except KeyError as e:
             return JsonResponse({"MESSAGE": f"KEY_ERROR:{e}"}, status=401)
+        except Exception as e:
+            return JsonResponse({"MESSAGE": f"{e}_ERROR!"}, status=400)
