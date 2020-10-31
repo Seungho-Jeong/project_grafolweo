@@ -50,7 +50,7 @@ class WorkDetailView(View):
                 "views"       : this_work.views,
                 "created_at"  : this_work.created_at,
                 "updated_at"  : this_work.updated_at,
-                "image_url"   : [ workimage.image_url for workimage in this_work.workimage_set.all() ],
+                "image_url"   : [ workimage.image_url for workimage in this_work.workimage_set.all() ] + [ wallpaper.image_url for wallpaper in this_work.wallpaperimage_set.all() ],
                 "tag"         : [ tag.name for tag in this_work.tag.all() ],
                 "commentNum"  : comments.count(),
                 "likeBtnNum"  : LikeIt.objects.filter(work_id = work_id).count(),
@@ -71,7 +71,8 @@ class WorkDetailView(View):
                 "others"      : [ {
                     "related_title"     : related_work.title,
                     "related_image_url" : related_work.workimage_set.first().image_url
-                    } for related_work in related_works ]
+                    } for related_work in related_works ],
+                "worksCount"  : related_works.count()
             }
             return JsonResponse({"artworkDetails": detail}, status=200)
 
@@ -224,6 +225,7 @@ class WallpaperDetailView(View):
             creator        = this_wallpaper.work.user
             detail         = {
                 "id"            : this_wallpaper.id,
+                "work_id"       : this_wallpaper.work.id,
                 "title"         : this_wallpaper.work.title,
                 "creator"       : this_wallpaper.work.user.user_name,
                 "creator_img"   : this_wallpaper.work.user.profile_image_url,
@@ -351,11 +353,12 @@ class WallpaperCardListView(View) :
                 cardlist = sorted(cardlist, reverse=True, key=lambda x: x["downloadNum"])
             return cardlist
 
-        limit     = int(request.GET.get('limit','9'))
-        offset    = int(request.GET.get('offset','0'))
-        sort_name = request.GET.get('sort')
-        order     = request.GET.get('order')
-        id        = request.GET.get('id')
+        limit        = int(request.GET.get('limit','9'))
+        offset       = int(request.GET.get('offset','0'))
+        sort_name    = request.GET.get('sort')
+        order        = request.GET.get('order','최신순')
+        id           = request.GET.get('id')
+        wallpaper_id = request.GET.get('wallpaper_id','')
         filter = {
             '태그별' : [Work.objects.filter(tag__id = id).select_related('user').prefetch_related("wallpaperimage_set"),"discoverTagData"],
             '색상별' : [Work.objects.filter(wallpaperimage__themecolor_id = id).select_related('user').prefetch_related("wallpaperimage_set"),"discoverColorData"],
@@ -379,6 +382,8 @@ class WallpaperCardListView(View) :
                 works        = Work.objects.all().select_related('user').prefetch_related("wallpaperimage_set")
             elif id :
                 works = filter[sort_name][0]
+                if wallpaper_id :
+                    works = works.exclude(wallpaperimage__id = wallpaper_id)
             else :
                 return JsonResponse({'Error': "Need id" }, status=400)
             if works :
@@ -407,29 +412,32 @@ class WallpaperdownloadcountView(View) :
             return JsonResponse({'Error': "Invalid wallpaper_id" }, status=400)
 
 class WorksListView(View) :
-
+    
     @login_decorator
     def get(self, request) :
         sort        = request.GET.get('sort','')
         limit       = int(request.GET.get('limit','9'))
         offset      = int(request.GET.get('offset','0'))
         category_id = request.GET.get('category_id',None)
-        sort_order  = [ {
+        sort_order  = [ { 
             '최신'     : '-created_at',
             '주목받는' : '-views'
         }, {
             '발견'     : 'Likes',
-            '데뷰'     : 'singup_time'
+            '데뷰'     : 'singup_time',
+            '피드'     : 'id'
         } ]
-        if sort == "피드":
-            works = [ work for creators in request.user.following.all() for work in creators.work_set.all()][offset:(offset+limit)]
-        elif category_id :
-            works = Work.objects.filter(category__id=category_id).select_related("user").prefetch_related("workimage_set", "likeit_set", "comment_set")
-        else :
-            works = Work.objects.all().select_related("user").prefetch_related("workimage_set", "likeit_set", "comment_set")
+
+        filter_dict = {}
+
+        if sort == '피드':
+            filter_dict.update({'user__in' : request.user.following.all()}) 
+        if category_id:
+            filter_dict.update({'category_id' : category_id})
+
+        works = Work.objects.filter(**filter_dict).select_related("user").prefetch_related("workimage_set", "likeit_set", "comment_set")
         if sort in sort_order[0] :
             works = works.order_by(sort_order[0][sort])[offset:(offset+limit)]
-
         workslist = [ {
                 "id"            : work.id,
                 "AuthorName"    : work.user.user_name,
@@ -457,7 +465,7 @@ class CategoryListView(View) :
         } for category in Category.objects.all().prefetch_related("work_set") ]
         return JsonResponse({'data': categorylist }, status=200)
 
-class CategoryTagView(View) :
+class CategoryTagView(View) : 
 
     def get(self, request) :
         category_id        = request.GET.get('category_id')
@@ -465,10 +473,10 @@ class CategoryTagView(View) :
         if categories_to_tags :
             taglist = [ {
                 "id"        : category_to_tag.tag.id ,
-                "name"      : category_to_tag.tag.name ,
-                "image_url" : category_to_tag.category.image_url
+                "name"      : category_to_tag.tag.name 
             } for category_to_tag in categories_to_tags ]
-            return JsonResponse({'listBannerTags': taglist }, status=200)
+            
+            return JsonResponse({'listBannerTags': taglist , "categoryImage" : Category.objects.get(id=category_id).image_url }, status=200)
         else :
             return JsonResponse({'MESSAGE': "wrong category" }, status=400)
 
@@ -490,4 +498,3 @@ class PopularCreatorView(View) :
             } for user in users ]
         creatorlist = sorted(creatorlist, reverse=True, key=lambda x: x["category_like"])[:16]
         return JsonResponse({'popularCreator': creatorlist }, status=200)
-
