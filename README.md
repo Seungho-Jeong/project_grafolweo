@@ -24,8 +24,8 @@ Naver [GRAFOLIO](https://grafolio.naver.com/) 서비스를 클론한 프로젝�
 ## Back-end
 
 ### API
-- Frame work: Django
-- Language: Python 3.8
+- Django
+- Python 3.8
 
 ### Database
 - MySQL
@@ -42,6 +42,7 @@ Naver [GRAFOLIO](https://grafolio.naver.com/) 서비스를 클론한 프로젝�
 - Prettier
 - CRA
 - SASS
+- HTML, CSS
 
 # 참여
 - Back-end: 2명(정승호, 김성태)
