@@ -21,20 +21,20 @@ Naver [GRAFOLIO](https://grafolio.naver.com/) 서비스를 클론한 프로젝�
 
 # 사용기술
 
-## Back-end
+### Back-end
 
-### API
+#### API
 - Django
 - Python 3.8
 
-### Database
+#### Database
 - MySQL
 
-### Library
+#### Library
 - PyJWT
 - Bcrypt
 
-## Front-end
+### Front-end
 - Javascript
 - React
 - Node, npm
