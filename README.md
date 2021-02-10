@@ -43,8 +43,8 @@ Naver [GRAFOLIO](https://grafolio.naver.com/) 서비스를 클론한 프로젝�
 
 ## Contributor
 ### Back-end(2명)
-- 정승호
-- 김성태
+- 정승호(본인)
+- 김성태(kimst5418)
 ### Front-end(2명)
 - 홍효정
 - 김보경
