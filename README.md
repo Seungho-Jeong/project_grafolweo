@@ -16,34 +16,35 @@ Naver [GRAFOLIO](https://grafolio.naver.com/) 서비스를 클론한 프로젝�
   - 댓글 기능 (작성, 수정, 삭제, 좋아요)
   - 작품 평가 (좋아요, 감동적이에요, 사고 싶어요 중 택일)
   
-# 데모 비디오
+## 데모 비디오
 [![demo](https://img.youtube.com/vi/QkHXSjSfr2c/maxresdefault.jpg)](https://www.youtube.com/watch?v=QkHXSjSfr2c)
 
-# 사용기술
+## 사용기술
 
 ### Back-end
 
 #### API
 - Django
 - Python 3.8
-
-#### Database
+#### RDS
 - MySQL
-
 #### Library
 - PyJWT
 - Bcrypt
 
 ### Front-end
-- Javascript
-- React
-- Node, npm
-- ESlient
-- Prettier
+- JavaScript
+- HTML
+- React (Class)
+- React-Router
+- React-Router-DOM
+- React-Slick
 - CRA
-- SASS
-- HTML, CSS
+- Node, npm
+- CSS, SASS
+- ESlint
+- Prettier
 
-# 참여
+## 참여
 - Back-end: 2명(정승호, 김성태)
 - Front-end: 2명(홍효정, 김보경, 임수현, 조연정)
