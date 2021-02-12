@@ -15,7 +15,7 @@ Naver [GRAFOLIO](https://grafolio.naver.com/) 서비스를 클론한 프로젝�
 ## 데모 비디오
 [![demo](https://img.youtube.com/vi/QkHXSjSfr2c/maxresdefault.jpg)](https://www.youtube.com/watch?v=QkHXSjSfr2c)
 
-## 사용기술
+## Tech Stack
 
 ### Back-end
 
@@ -41,7 +41,7 @@ Naver [GRAFOLIO](https://grafolio.naver.com/) 서비스를 클론한 프로젝�
 - ESlint
 - Prettier
 
-## Contributor
+## Contributors
 ### Back-end(2명)
 - 정승호(본인)
 - 김성태(kimst5418)
