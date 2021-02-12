@@ -12,7 +12,7 @@ Naver [GRAFOLIO](https://grafolio.naver.com/) 서비스를 클론한 프로젝�
 - 고객 가입시 입력 데이터 유효성 검사(Validation)
 - 고객 로그인 비밀번호 암호화
   
-## 데모 비디오
+## Demo Video
 [![demo](https://img.youtube.com/vi/QkHXSjSfr2c/maxresdefault.jpg)](https://www.youtube.com/watch?v=QkHXSjSfr2c)
 
 ## Tech Stack
