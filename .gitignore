@@ -1,6 +1,16 @@
 # Created by https://www.toptal.com/developers/gitignore/api/django,python,windows,linux,macos
 # Edit at https://www.toptal.com/developers/gitignore?templates=django,python,windows,linux,macos
 
+### etc ###
+crwaling.py
+Dockerfile
+mock.numbers
+dummy.py
+.idea
+.vscode
+project_grafolweo
+.gitignore
+
 ### Django ###
 *.log
 *.pot
