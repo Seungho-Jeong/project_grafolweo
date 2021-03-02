@@ -1,4 +1,3 @@
-
 import random
 import json
 
@@ -28,15 +27,26 @@ from work.models    import (
 class WorkDetailView(View):
     @login_decorator
     def get(self, request, work_id):
-        this_work     = Work.objects.select_related("user").get(id = work_id)
-        this_work.views += 1
-        this_work.save()
-
-        comments      = Comment.objects.filter(work_id = work_id).select_related("work")
-        related_works = this_work.user.work_set.exclude(id = work_id)
-        like_it_kinds = LikeItKind.objects.all()
+        """
+        작품 상세 페이지 조회
+        :param work_id: 작품 ID(PK)
+        :return:
+            200: success
+            400: not exist
+        """
 
         try:
+            this_work = Work.objects.select_related("user").get(id = work_id)
+
+            # 조회수(Hits)
+            this_work.views += 1
+            this_work.save()
+
+            # 상세 페이지에 표시될 다른 테이블 정보(Relation table)
+            comments      = Comment.objects.filter(work_id = work_id).prefetch_related("work")
+            related_works = Work.objects.filter(user_id = this_work.user.id).exclude(id = work_id)
+            like_it_kinds = LikeItKind.objects.all()
+
             detail    = {
                 "id"          : this_work.id,
                 "title"       : this_work.title,
@@ -68,7 +78,7 @@ class WorkDetailView(View):
                         work_id         = work_id,
                         like_it_kind_id = kind
                     ).count()} for kind in like_it_kinds.all()],
-                "others"      : [ {
+                "others"      : [{
                     "related_title"     : related_work.title,
                     "related_image_url" : related_work.workimage_set.first().image_url
                     } for related_work in related_works ],
@@ -78,14 +88,25 @@ class WorkDetailView(View):
 
         except Work.DoesNotExist:
             return JsonResponse({"MESSAGE": "DOES_NOT_EXIST_PAGE"}, status=400)
+        except Exception as e:
+            return JsonResponse({"MESSAGE": "{}".format(e)}, status=400)
 
 class CommentView(View):
     @login_decorator
     def post(self, request, work_id):
-        data = json.loads(request.body)
+        """
+        댓글 작성
+        작품 상세 페이지(GET)에 연계되는 댓글로 GET 메서드는 제외함
+        :param request: comment_content
+        :return:
+            200: success
+            400: error
+        """
 
         try:
-            if not User.objects.filter(id = request.user.id).exists():
+            data = json.loads(request.body)
+
+            if request.user == False:
                 return JsonResponse({"MESSAGE": "UNAUTHORIZATION"}, status=401)
 
             if not Work.objects.filter(id = work_id).exists():
@@ -96,35 +117,62 @@ class CommentView(View):
                 user_id         = request.user.id,
                 comment_content = data["comment_content"]
             )
-            return JsonResponse({"MESSAGE": "COMMENT_SUCCESS"}, status=201)
+
+            return JsonResponse({"MESSAGE": "SUCCESS"}, status=201)
 
         except KeyError as e:
-            return JsonResponse({"MESSAGE": f"{e}_IS_MISSING"}, status=400)
+            return JsonResponse({"MESSAGE": "{}_IS_MISSING".format(e)}, status=400)
 
     @login_decorator
     def delete(self, request, work_id, comment_id):
+        """
+        댓글 삭제
+        :param work_id: 작품 ID
+        :param comment_id: 삭제 대상 댓글 ID
+        :return:
+            200: success
+            400: exception error
+            401: authorization error
+        """
 
         try:
+            if request.user == False:
+                return JsonResponse({"MESSAGE": "UNAUTHORIZATION"}, status=401)
+
             comment = Comment.objects.get(id = comment_id, work_id = work_id)
             comment.delete()
+
+            return JsonResponse({"MESSAGE": "SUCCESS"}, status=200)
+
         except Comment.DoesNotExist:
             return JsonResponse({"MESSAGE": "DOES_NOT_EXIST_COMMENT"}, status=400)
 
     @login_decorator
     def patch(self, request, work_id, comment_id):
-        data = json.loads(request.body)
+        """
+        댓글 수정
+        :param work_id: 작품 ID
+        :parma comment_id: 수정 대상 댓글 ID
+        :return:
+            200: success
+            400: not exist error
+            401: authorization error
+        """
 
         try:
-            if not Work.objects.filter(id = work_id).exists():
-                return JsonResponse({"MESSAGE":"DOES_NOT_EXIST_PAGE"}, status=400)
+            data = json.loads(request.body)
+
+            if request.user == False:
+                return JsonResponse({"MESSAGE": "UNAUTHORIZATION"}, status=401)
 
             if Comment.objects.get(id = comment_id).user.id != request.user.id:
-                return JsonResponse({"MESSAGE": "UNAUTHORIZAION"}, status=401)
+                return JsonResponse({"MESSAGE": "UNAUTHORIZATION"}, status=401)
 
             target                 = Comment.objects.get(id = comment_id)
             target.comment_content = data["comment_content"]
             target.save()
-            return JsonResponse({"MESSAGE": "MODIFY_SUCCESS"}, status=200)
+
+            return JsonResponse({"MESSAGE": "SUCCESS"}, status=200)
 
         except Comment.DoesNotExist:
             return JsonResponse({"MESSAGE": "DOES_NOT_EXIST_COMMENT"}, status=400)
@@ -132,10 +180,24 @@ class CommentView(View):
 class CommentLikeView(View):
     @login_decorator
     def post(self, request, work_id, comment_id):
-        data = json.loads(request.body)
-        like = data["like"]
+        """
+        댓글 좋아요
+        - 싹 뜯어고쳐야 함
+        - N-N table 생성 및 코드 변경 필요
+        - 참고 코드
+            if request.user in post.like_users.all():
+                post.like_users.remove(request.user)
+            else:
+                post.like_users.add(request.user)
+        """
 
         try:
+            data = json.loads(request.body)
+            like = data["like"]
+
+            if request.user == False:
+                return JsonResponse({"MESSAGE": "UNAUTHORIZATION"}, status=401)
+
             if CommentLike.objects.filter(
                 comment_id = comment_id,
                 user_id    = request.user.id
@@ -154,12 +216,18 @@ class CommentLikeView(View):
             count = CommentLike.objects.filter(comment_id = comment_id).count()
             return JsonResponse({"LIKEIT_SUCCESS": count}, status=201)
 
+        except Comment.DoesNotExist:
+            return JsonResponse({"MESSAGE": "DOES_NOT_EXIST_COMMENT"}, status=400)
         except User.DoesNotExist:
             return JsonResponse({"MESSAGE": "DOES_NOT_EXIST_USER"}, status=401)
 
 class LikeView(View):
     @login_decorator
     def post(self, request, work_id):
+        """
+        작품 평가
+        - 댓글 좋아요 코드를 참고하여 싹 다 뜯어고칠 필요
+        """
         data    = json.loads(request.body)
         user_id = request.user.id
 
@@ -220,6 +288,10 @@ class LikeView(View):
 
 class WallpaperDetailView(View):
     def get(self, request, wallpaper_id):
+        """
+        배경화면 상세 페이지
+        """
+
         try:
             this_wallpaper = WallpaperImage.objects.select_related("work").get(id = wallpaper_id)
             creator        = this_wallpaper.work.user
@@ -242,7 +314,6 @@ class WallpaperDetailView(View):
             return JsonResponse({"MESSAGE": "DOES_NOT_EXIST_PAGE"}, status=400)
 
 class TopCreatorsView(View) :
-
     @login_decorator
     def get(self, request) :
         CONST_LENGTH = 9
@@ -258,7 +329,6 @@ class TopCreatorsView(View) :
         return JsonResponse({'topCreators': creatorlist }, status=200)
 
 class FollowView(View) :
-
     @login_decorator
     def post(self, request) :
         if request.user :
@@ -273,6 +343,7 @@ class FollowView(View) :
                     "followBtn" : False
                 }
                 return JsonResponse({'data': data }, status=201)
+
             except Follow.DoesNotExist :
                 try :
                     Follow.objects.create( follower_id = user_id, creator_id = creator_id)
@@ -283,10 +354,12 @@ class FollowView(View) :
                     return JsonResponse({'data': data }, status=201)
                 except IntegrityError :
                     return JsonResponse({'MESSAGE': "Error: unknown user" }, status=400)
+
             except KeyError as e :
                 return JsonResponse({'MESSAGE': f"KeyError: {e}" }, status=400)
             except json.decoder.JSONDecodeError :
                 return JsonResponse({'MESSAGE': "Error: json data error" }, status=400)
+
         return JsonResponse({'MESSAGE': "Need login" }, status=400)
 
     @login_decorator
@@ -300,7 +373,6 @@ class FollowView(View) :
         return JsonResponse({'data': data }, status=200)
 
 class EditorPickWallpaperView(View) :
-
     def get(self, request) :
         CONST_LENGTH = 8
         tag_id       = request.GET.get('tag')
