@@ -41,15 +41,11 @@ class WorkDetailView(View):
 
         try:
             this_work = Work.objects.select_related("user").get(id=work_id)
+            related_works = Work.objects.filter(user_id=this_work.user.id).exclude(id=work_id)
 
             # 조회수(Hits)
             this_work.views += 1
             this_work.save()
-
-            # 상세 페이지에 표시될 다른 테이블 정보(Relation table)
-            comments = Comment.objects.filter(work_id=work_id).prefetch_related("work")
-            related_works = Work.objects.filter(user_id=this_work.user.id).exclude(id=work_id)
-            like_it_kinds = LikeItKind.objects.all()
 
             detail = {
                 "id": this_work.id,
@@ -67,21 +63,16 @@ class WorkDetailView(View):
                 "image_url": [workimage.image_url for workimage in this_work.workimage_set.all()]
                              + [wallpaper.image_url for wallpaper in this_work.wallpaperimage_set.all()],
                 "tag": [tag.name for tag in this_work.tag.all()],
-                "commentNum": comments.count(),
-                "followerNum": this_work.user.creator.all().count(),
-                "followingNum": this_work.user.follower.all().count(),
-                "likeIt": [{
-                    f"like_id_{kind.id}": LikeIt.objects.filter(
-                        work_id=work_id,
-                        like_it_kind_id=kind
-                    ).count()} for kind in like_it_kinds.all()],
-                "others": [{
+                "follower_num": this_work.user.creator.all().count(),
+                "following_num": this_work.user.follower.all().count(),
+                "related_works": [{
                     "related_title": related_work.title,
                     "related_image_url": related_work.workimage_set.first().image_url
                 } for related_work in related_works],
-                "worksCount": related_works.count()
+                "related_works_count": related_works.count()
             }
-            return JsonResponse({"artworkDetails": detail}, status=200)
+
+            return JsonResponse({"detail": detail}, status=200)
 
         except Work.DoesNotExist:
             return JsonResponse({"MESSAGE": "DOES_NOT_EXIST_PAGE"}, status=400)
@@ -105,7 +96,9 @@ class CommentView(View):
                 return JsonResponse({"MESSAGE": "DOES_NOT_EXIST_PAGE"}, status=400)
 
             comments_qs = Comment.objects.filter(work_id=work_id).prefetch_related("work")
-            comments = [{
+
+            comments_num = comments_qs.count()
+            comments_lst = [{
                 "comment_id": comment.id,
                 "commenter_name": comment.user.user_name,
                 "commenter_image": comment.user.profile_image_url,
@@ -113,7 +106,7 @@ class CommentView(View):
                 "comment_created_at": comment.created_at
             } for comment in comments_qs]
 
-            return JsonResponse({"MESSAGE": "SUCCESS", "COMMENTS": comments}, status=200)
+            return JsonResponse({"MESSAGE": "SUCCESS", "TOT": comments_num, "LIST": comments_lst}, status=200)
 
         except Exception as e:
             return JsonResponse({"MESSAGE": "{}".format(e)}, status=400)
@@ -146,6 +139,8 @@ class CommentView(View):
 
         except KeyError as e:
             return JsonResponse({"MESSAGE": "{}_IS_MISSING".format(e)}, status=400)
+        except Exception as e:
+            return JsonResponse({"MESSAGE": "{}".format(e)}, status=400)
 
     @login_decorator
     def delete(self, request, work_id, comment_id):
@@ -170,6 +165,8 @@ class CommentView(View):
 
         except Comment.DoesNotExist:
             return JsonResponse({"MESSAGE": "DOES_NOT_EXIST_COMMENT"}, status=400)
+        except Exception as e:
+            return JsonResponse({"MESSAGE": "{}".format(e)}, status=400)
 
     @login_decorator
     def patch(self, request, work_id, comment_id):
@@ -200,6 +197,8 @@ class CommentView(View):
 
         except Comment.DoesNotExist:
             return JsonResponse({"MESSAGE": "DOES_NOT_EXIST_COMMENT"}, status=400)
+        except Exception as e:
+            return JsonResponse({"MESSAGE": "{}".format(e)}, status=400)
 
 
 class CommentLikeView(View):
@@ -236,6 +235,8 @@ class CommentLikeView(View):
             return JsonResponse({"MESSAGE": "DOES_NOT_EXIST_COMMENT"}, status=400)
         except User.DoesNotExist:
             return JsonResponse({"MESSAGE": "DOES_NOT_EXIST_USER"}, status=401)
+        except Exception as e:
+            return JsonResponse({"MESSAGE": "{}".format(e)}, status=400)
 
 
 class LikeView(View):
@@ -253,14 +254,14 @@ class LikeView(View):
             if not Work.objects.filter(id=work_id).exists():
                 return JsonResponse({"MESSAGE": "DOES_NOT_EXIST_PAGE"}, status=400)
 
-            likeBtnNum = LikeIt.objects.filter(work_id=work_id).count()
+            like_kinds = LikeItKind.objects.all()
 
-            kinds = LikeItKind.objects.all()
+            like_num = LikeIt.objects.filter(work_id=work_id).count()
             like_lst = [{kind.name: LikeIt.objects.filter(work_id=work_id,
                                                           like_it_kind_id=kind).count()}
-                        for kind in kinds]
+                        for kind in like_kinds]
 
-            return JsonResponse({"MESSAGE": "SUCCESS", "TOT": likeBtnNum, "LIST": like_lst}, status=200)
+            return JsonResponse({"MESSAGE": "SUCCESS", "TOT": like_num, "LIST": like_lst}, status=200)
 
         except Exception as e:
             return JsonResponse({"MESSAGE": "error_{}".format(e)}, status=400)
@@ -342,6 +343,8 @@ class WallpaperDetailView(View):
 
         except Work.DoesNotExist:
             return JsonResponse({"MESSAGE": "DOES_NOT_EXIST_PAGE"}, status=400)
+        except Exception as e:
+            return JsonResponse({"MESSAGE": "{}".format(e)}, status=400)
 
 
 class TopCreatorsView(View):
