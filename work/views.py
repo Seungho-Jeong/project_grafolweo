@@ -4,6 +4,7 @@ import json
 from django.http import JsonResponse
 from django.views import View
 
+from django.db.models import Count
 from django.db import IntegrityError
 from user.utils import login_decorator
 from user.models import User, Follow
@@ -31,12 +32,11 @@ class WorkDetailView(View):
     def get(self, request, work_id):
         """
         작품 상세 페이지 조회
-        * 댓글을 API가 아닌 상세 페이지에 구현함 -> 댓글 GET 메서드 API 구현 필요
-        * 평가를 API가 아닌 상세 페이지에 구현함 -> 평가 GET 메서드 API 구현 필요
         :param work_id: 작품 ID(PK)
         :return:
             200: success
-            400: not exist
+            400: exception error
+            404: not found error
         """
 
         try:
@@ -71,13 +71,12 @@ class WorkDetailView(View):
                 } for related_work in related_works],
                 "related_works_count": related_works.count()
             }
-
             return JsonResponse({"detail": detail}, status=200)
 
         except Work.DoesNotExist:
-            return JsonResponse({"MESSAGE": "DOES_NOT_EXIST_PAGE"}, status=400)
+            return JsonResponse({"MESSAGE": "DOES_NOT_EXIST_PAGE"}, status=404)
         except Exception as e:
-            return JsonResponse({"MESSAGE": "{}".format(e)}, status=400)
+            return JsonResponse({"MESSAGE": "ERORR_IS_{}".format(e)}, status=400)
 
 
 class CommentView(View):
@@ -88,14 +87,15 @@ class CommentView(View):
         :param work_id: 작품 ID
         :return:
             200: success
-            400: not exist error, exception error
+            400: exception error
+            404: not found error
         """
 
         try:
-            if not Work.objects.filter(id=work_id).exists():
-                return JsonResponse({"MESSAGE": "DOES_NOT_EXIST_PAGE"}, status=400)
+            if not Work.objects.filter(id=work_id).prefetch_related("comments").exists():
+                return JsonResponse({"MESSAGE": "DOES_NOT_EXIST_PAGE"}, status=404)
 
-            comments_qs = Comment.objects.filter(work_id=work_id).prefetch_related("work")
+            comments_qs = Comment.objects.filter(work_id=work_id)
 
             comments_num = comments_qs.count()
             comments_lst = [{
@@ -105,11 +105,10 @@ class CommentView(View):
                 "comment_content": comment.comment_content,
                 "comment_created_at": comment.created_at
             } for comment in comments_qs]
-
-            return JsonResponse({"MESSAGE": "SUCCESS", "TOT": comments_num, "LIST": comments_lst}, status=200)
+            return JsonResponse({"MESSAGE": "SUCCESS", "COUNT": comments_num, "LIST": comments_lst}, status=200)
 
         except Exception as e:
-            return JsonResponse({"MESSAGE": "{}".format(e)}, status=400)
+            return JsonResponse({"MESSAGE": "ERORR_IS_{}".format(e)}, status=400)
 
     @login_decorator
     def post(self, request, work_id):
@@ -119,7 +118,8 @@ class CommentView(View):
         :param request: comment_content
         :return:
             200: success
-            400: error
+            400: key error, exception error
+            404: not found error
         """
 
         try:
@@ -129,7 +129,7 @@ class CommentView(View):
                 return JsonResponse({"MESSAGE": "UNAUTHORIZATION"}, status=401)
 
             if not Work.objects.filter(id=work_id).exists():
-                return JsonResponse({"MESSAGE": "DOES_NOT_EXIST_PAGE"}, status=400)
+                return JsonResponse({"MESSAGE": "DOES_NOT_EXIST_PAGE"}, status=404)
 
             Comment.objects.create(work_id=work_id,
                                    user_id=request.user.id,
@@ -140,7 +140,7 @@ class CommentView(View):
         except KeyError as e:
             return JsonResponse({"MESSAGE": "{}_IS_MISSING".format(e)}, status=400)
         except Exception as e:
-            return JsonResponse({"MESSAGE": "{}".format(e)}, status=400)
+            return JsonResponse({"MESSAGE": "ERORR_IS_{}".format(e)}, status=400)
 
     @login_decorator
     def delete(self, request, work_id, comment_id):
@@ -152,6 +152,7 @@ class CommentView(View):
             200: success
             400: exception error
             401: authorization error
+            404: not found error
         """
 
         try:
@@ -164,9 +165,9 @@ class CommentView(View):
             return JsonResponse({"MESSAGE": "SUCCESS"}, status=200)
 
         except Comment.DoesNotExist:
-            return JsonResponse({"MESSAGE": "DOES_NOT_EXIST_COMMENT"}, status=400)
+            return JsonResponse({"MESSAGE": "DOES_NOT_EXIST_COMMENT"}, status=404)
         except Exception as e:
-            return JsonResponse({"MESSAGE": "{}".format(e)}, status=400)
+            return JsonResponse({"MESSAGE": "ERORR_IS_{}".format(e)}, status=400)
 
     @login_decorator
     def patch(self, request, work_id, comment_id):
@@ -176,15 +177,12 @@ class CommentView(View):
         :parma comment_id: 수정 대상 댓글 ID
         :return:
             200: success
-            400: not exist error
             401: authorization error
+            404: not found error
         """
 
         try:
             data = json.loads(request.body)
-
-            if not request.user:
-                return JsonResponse({"MESSAGE": "UNAUTHORIZATION"}, status=401)
 
             if Comment.objects.get(id=comment_id).user.id is not request.user.id:
                 return JsonResponse({"MESSAGE": "UNAUTHORIZATION"}, status=401)
@@ -196,47 +194,48 @@ class CommentView(View):
             return JsonResponse({"MESSAGE": "SUCCESS"}, status=200)
 
         except Comment.DoesNotExist:
-            return JsonResponse({"MESSAGE": "DOES_NOT_EXIST_COMMENT"}, status=400)
+            return JsonResponse({"MESSAGE": "DOES_NOT_EXIST_COMMENT"}, status=404)
         except Exception as e:
-            return JsonResponse({"MESSAGE": "{}".format(e)}, status=400)
+            return JsonResponse({"MESSAGE": "ERORR_IS_{}".format(e)}, status=400)
 
 
 class CommentLikeView(View):
     @login_decorator
-    def post(self, request, work_id, comment_id):
+    def get(self, request, work_id, comment_id):
         """
         댓글 좋아요
-        - DB 적용없이 JSON Response body 리턴만 주고 있음
-        - N-N table 생성 필요
-        - 참고 코드
-            if request.user in post.like_users.all():
-                post.like_users.remove(request.user)
-            else:
-                post.like_users.add(request.user)
+        :param work_id: 작품 ID
+        :param comment_id: 댓글 ID
+        :return:
+            200: create success, delete success
+            400: exception error
+            401: authorization error
+            404: not found
         """
 
         try:
-            data = json.loads(request.body)
-            like = data["like"]
+            user_id = request.user.id
+            comment = CommentLike.objects.filter(comment_id=comment_id)
+
+            if not Work.objects.filter(id=work_id).exists():
+                return JsonResponse({"MESSAGE": "DOES_NOT_EXIST_PAGE"}, status=404)
+
+            if not Comment.objects.filter(id=comment_id).exists():
+                return JsonResponse({"MESSAGE": "DOES_NOT_EXIST_COMMENT"}, status=404)
 
             if not request.user:
                 return JsonResponse({"MESSAGE": "UNAUTHORIZATION"}, status=401)
 
-            if CommentLike.objects.filter(comment_id=comment_id, user_id=request.user.id).exists():
-                CommentLike.objects.filter(comment_id=comment_id, user_id=request.user.id)[0].delete()
-                count = CommentLike.objects.filter(comment_id=comment_id).count()
-                return JsonResponse({"CANCEL_SUCCESS": count}, status=200)
+            if not comment.filter(user_id=user_id):
+                CommentLike.objects.create(comment_id=comment_id, user_id=user_id)
+                return JsonResponse({"MESSAGE": "SUCCESS", "LIKE": comment.count()})
 
-            CommentLike.objects.create(comment_id=comment_id, user_id=request.user.id)
-            count = CommentLike.objects.filter(comment_id=comment_id).count()
-            return JsonResponse({"LIKEIT_SUCCESS": count}, status=201)
+            else:
+                comment.filter(user_id=user_id)[0].delete()
+                return JsonResponse({"MESSAGE": "SUCCESS", "LIKE": comment.count()})
 
-        except Comment.DoesNotExist:
-            return JsonResponse({"MESSAGE": "DOES_NOT_EXIST_COMMENT"}, status=400)
-        except User.DoesNotExist:
-            return JsonResponse({"MESSAGE": "DOES_NOT_EXIST_USER"}, status=401)
         except Exception as e:
-            return JsonResponse({"MESSAGE": "{}".format(e)}, status=400)
+            return JsonResponse({"MESSAGE": "ERORR_IS_{}".format(e)}, status=400)
 
 
 class LikeView(View):
@@ -247,12 +246,12 @@ class LikeView(View):
         :param work_id: 작품 ID
         :return:
             200: success
-            400: not exist error
+            404: not found error
         """
 
         try:
             if not Work.objects.filter(id=work_id).exists():
-                return JsonResponse({"MESSAGE": "DOES_NOT_EXIST_PAGE"}, status=400)
+                return JsonResponse({"MESSAGE": "DOES_NOT_EXIST_PAGE"}, status=404)
 
             like_kinds = LikeItKind.objects.all()
 
@@ -264,68 +263,79 @@ class LikeView(View):
             return JsonResponse({"MESSAGE": "SUCCESS", "TOT": like_num, "LIST": like_lst}, status=200)
 
         except Exception as e:
-            return JsonResponse({"MESSAGE": "error_{}".format(e)}, status=400)
+            return JsonResponse({"MESSAGE": "ERORR_IS_{}".format(e)}, status=400)
 
     @login_decorator
     def post(self, request, work_id):
         """
         작품 평가
-        GET 메서드 추가 필요
+        :request:
+            "like_it_kind_id": 1~3(JSON)
+            1: 좋아요, 2: 감동받았어요, 3: 사고싶어요 (변경 가능)
+        :return:
+            200: change success, cancel success
+            201: create success
+            400: exception error
         """
 
-        data = json.loads(request.body)
-        user_id = request.user.id
-
         try:
-            like_it_kinds = LikeItKind.objects.all()
-            kind_id = data["like_it_kind_id"]
+            data = json.loads(request.body)
 
-            if LikeIt.objects.filter(
-                    work_id=work_id, user_id=user_id, like_it_kind_id=kind_id).exists():
-                LikeIt.objects.filter(
-                    work_id=work_id, user_id=user_id, like_it_kind_id=kind_id)[0].delete()
+            if not Work.objects.filter(id=work_id).exists():
+                return JsonResponse({"MESSAGE": "DOES_NOT_EXIST_PAGE"}, status=404)
 
-                likeIt = [{
-                    f"like_id_{kind.id}": LikeIt.objects.filter(
-                        work_id=work_id, like_it_kind_id=kind).count()} for kind in like_it_kinds.all()]
+            if not request.user:
+                return JsonResponse({"MESSAGE": "UNAUTHORIZATION"}, status=401)
 
-                return JsonResponse({"CANCEL_SUCCESS": likeIt}, status=200)
+            user_id = request.user.id
+            user_pick = data["like_it_kind_id"]
+            user_picked = LikeIt.objects.filter(work_id=work_id, user_id=user_id)
+            search_target = LikeIt.objects.filter(work_id=work_id)
 
-            if LikeIt.objects.filter(work_id=work_id, user_id=user_id).exists():
-                target = LikeIt.objects.filter(work_id=work_id, user_id=user_id)[0]
+            # 이미 내린 평가를 다시 클릭하는 경우(취소)
+            if user_picked.filter(like_it_kind_id=user_pick).exists():
+                user_picked.delete()
 
-                target.like_it_kind_id = kind_id
-                target.save()
+                picked_list = [hits for hits in search_target.values('like_it_kind_id').annotate(
+                    like_count=Count('like_it_kind_id')).order_by("like_it_kind_id")]
 
-                likeIt = [{
-                    f"like_id_{kind.id}": LikeIt.objects.filter(
-                        work_id=work_id, like_it_kind_id=kind).count()} for kind in like_it_kinds.all()]
+                return JsonResponse({"MESSAGE": "SUCCESS", "PICKED_LIST": picked_list}, status=200)
 
-                return JsonResponse({"CHANGE_SUCCESS": likeIt}, status=200)
+            # 이미 평가를 내렸는데 다른 평가를 클릭하는 경우(변경)
+            if user_picked:
+                user_picked[0].like_it_kind_id = user_pick
+                user_picked[0].save()
 
-            LikeIt.objects.create(
-                work_id=work_id, user_id=user_id, like_it_kind_id=kind_id
-            )
+                picked_list = [hits for hits in search_target.values('like_it_kind_id').annotate(
+                    like_count=Count('like_it_kind_id')).order_by("like_it_kind_id")]
 
-            likeIt = [{
-                f"like_id_{kind.id}": LikeIt.objects.filter(
-                    work_id=work_id, like_it_kind_id=kind).count()} for kind in like_it_kinds.all()]
+                return JsonResponse({"MESSAGE": "SUCCESS", "PICKED_LIST": picked_list}, status=200)
 
-            return JsonResponse({"LIKEIT_SUCCESS": likeIt}, status=201)
+            # 최초로 평가하는 경우(신규)
+            else:
+                LikeIt.objects.create(work_id=work_id, user_id=user_id, like_it_kind_id=user_pick)
+                picked_list = [hits for hits in search_target.values('like_it_kind_id').annotate(
+                    like_count=Count('like_it_kind_id')).order_by("like_it_kind_id")]
+
+            return JsonResponse({"MESSAGE": "SUCCESS", "PICKED_LIST": picked_list}, status=201)
 
         except Exception as e:
-            return JsonResponse({"MESSAGE": f"ERROR{e}"}, status=400)
+            return JsonResponse({"MESSAGE": "ERORR_IS_{}".format(e)}, status=400)
 
 
 class WallpaperDetailView(View):
     def get(self, request, wallpaper_id):
         """
         배경화면 상세 페이지
+        :param wallpaper_id: 배경화면 페이지 ID
+        :return:
+            200: success
+            400: exception error
+            404: not found error
         """
 
         try:
-            this_wallpaper = WallpaperImage.objects.select_related("work").get(id=wallpaper_id)
-            creator = this_wallpaper.work.user
+            this_wallpaper = WallpaperImage.objects.select_related("work", "themecolor").get(id=wallpaper_id)
             detail = {
                 "id": this_wallpaper.id,
                 "work_id": this_wallpaper.work.id,
@@ -342,9 +352,9 @@ class WallpaperDetailView(View):
             return JsonResponse({"wallpaperDetails": detail}, status=200)
 
         except Work.DoesNotExist:
-            return JsonResponse({"MESSAGE": "DOES_NOT_EXIST_PAGE"}, status=400)
+            return JsonResponse({"MESSAGE": "DOES_NOT_EXIST_PAGE"}, status=404)
         except Exception as e:
-            return JsonResponse({"MESSAGE": "{}".format(e)}, status=400)
+            return JsonResponse({"MESSAGE": "ERORR_IS_{}".format(e)}, status=400)
 
 
 class TopCreatorsView(View):
